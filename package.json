@@ -1,0 +1,27 @@
+{
+	"name": "@ach/ui-kit",
+	"version": "0.1.0",
+	"description": "Общая дизайн-система: токены, контролы, composables",
+	"license": "UNLICENSED",
+	"type": "module",
+	"sideEffects": [
+		"*.css"
+	],
+	"files": [
+		"src",
+		"nuxt",
+		"README.md"
+	],
+	"exports": {
+		".": "./src/index.ts",
+		"./nuxt": "./nuxt/module.ts",
+		"./tokens.css": "./src/styles/tokens.css",
+		"./element-plus-bridge.css": "./src/styles/element-plus-bridge.css",
+		"./components/*": "./src/components/*",
+		"./icons": "./src/icons/index.ts",
+		"./icons/*": "./src/icons/*"
+	},
+	"peerDependencies": {
+		"vue": "^3.5.0"
+	}
+}
