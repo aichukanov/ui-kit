@@ -87,6 +87,15 @@ const role = computed(() =>
  * подложке базовый success даёт 2.4:1, warning 2.1:1 — ниже нормы AA.
  */
 .app-alert {
+	/*
+	 * Высота строки заголовка. Иконка и крестик тянутся к ней, а не к центру
+	 * блока: у многострочного алерта они должны стоять на ПЕРВОЙ строке.
+	 * Значение в токенах, а не в em, — у иконки своя font-size, и em считался
+	 * бы от неё.
+	 */
+	--alert-line-height: 1.5;
+	--alert-line: calc(var(--font-size-sm) * var(--alert-line-height));
+
 	display: flex;
 	align-items: flex-start;
 	gap: var(--spacing-sm);
@@ -124,9 +133,12 @@ const role = computed(() =>
 
 .app-alert__icon {
 	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	flex-shrink: 0;
-	/* Выравнивание по первой строке заголовка, а не по центру блока */
-	margin-top: 0.1em;
+	/* Бокс ростом в строку заголовка — иконка центрируется в нём сама,
+	   без подгонки отступом на глаз */
+	height: var(--alert-line);
 	font-size: var(--font-size-base);
 }
 
@@ -138,12 +150,12 @@ const role = computed(() =>
 .app-alert__title {
 	margin: 0;
 	font-weight: var(--font-weight-medium);
-	line-height: 1.5;
+	line-height: var(--alert-line-height);
 }
 
 .app-alert__description {
 	margin: var(--spacing-xs) 0 0;
-	line-height: 1.5;
+	line-height: var(--alert-line-height);
 	font-weight: var(--font-weight-normal);
 }
 

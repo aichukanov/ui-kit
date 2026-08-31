@@ -26,6 +26,21 @@ const icons: Record<ToastType, unknown> = {
 	warning: IconAlertTriangle,
 	info: IconInfo,
 };
+
+/**
+ * Замораживает ширину уходящего тоста.
+ *
+ * На уходе тост выводится из потока (`position: absolute` в `-leave-active`),
+ * чтобы остальные плавно поднялись на его место. Но вне потока он теряет
+ * ширину, полученную от флекс-контейнера, и пересчитывает её заново — текст
+ * переверстывается, тост «растягивается вниз» и только потом исчезает.
+ * Ширину в пикселях можно узнать только из живого DOM, поэтому CSS здесь
+ * не помог бы.
+ */
+function freezeWidth(el: Element) {
+	const node = el as HTMLElement;
+	node.style.width = `${node.offsetWidth}px`;
+}
 </script>
 
 <template>
@@ -41,7 +56,7 @@ const icons: Record<ToastType, unknown> = {
 			aria-live="polite"
 			aria-atomic="false"
 		>
-			<TransitionGroup name="app-toast">
+			<TransitionGroup name="app-toast" @before-leave="freezeWidth">
 				<div
 					v-for="toast in toasts"
 					:key="toast.id"
@@ -72,25 +87,36 @@ const icons: Record<ToastType, unknown> = {
 	/* Ниже модалок, но выше всего остального: тост поверх открытого диалога */
 	z-index: var(--z-tooltip);
 	top: var(--spacing-lg);
-	left: 50%;
-	transform: translateX(-50%);
+	/*
+	 * Контейнер растянут по окну, а тосты центрируются внутри него. Раньше он
+	 * был `width: max-content` со сдвигом на половину себя — и при удалении
+	 * тоста менял ширину, из-за чего остальные дёргались по горизонтали,
+	 * а уходящий (он вне потока) оставался у прежней координаты.
+	 */
+	left: var(--spacing-lg);
+	right: var(--spacing-lg);
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	gap: var(--spacing-sm);
-	width: max-content;
-	max-width: calc(100vw - 2 * var(--spacing-lg));
 	/* Пустой контейнер не должен перехватывать клики по странице */
 	pointer-events: none;
 }
 
 .app-toast {
+	/* Высота строки сообщения: по ней выравниваются иконка и крестик — они
+	   должны стоять на ПЕРВОЙ строке, а не по центру многострочного тоста */
+	--toast-line-height: 1.5;
+	--toast-line: calc(var(--font-size-sm) * var(--toast-line-height));
+
 	pointer-events: auto;
 	display: flex;
 	align-items: flex-start;
 	gap: var(--spacing-sm);
 	box-sizing: border-box;
-	max-width: 100%;
+	/* Контейнер во всю ширину окна, поэтому длинная ошибка растянулась бы
+	   на весь экран — ограничиваем комфортной длиной строки */
+	max-width: min(100%, 32rem);
 	padding: var(--spacing-md) var(--spacing-lg);
 	border: var(--border-width-thin) solid var(--toast-border);
 	border-radius: var(--border-radius-lg);
@@ -127,14 +153,17 @@ const icons: Record<ToastType, unknown> = {
 
 .app-toast__icon {
 	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	flex-shrink: 0;
-	margin-top: 0.1em;
+	/* Бокс ростом в строку сообщения — иконка центрируется в нём сама */
+	height: var(--toast-line);
 	font-size: var(--font-size-base);
 }
 
 .app-toast__message {
 	margin: 0;
-	line-height: 1.5;
+	line-height: var(--toast-line-height);
 	/* Длинный текст ошибки должен переноситься, а не растягивать тост */
 	overflow-wrap: anywhere;
 }
@@ -144,9 +173,12 @@ const icons: Record<ToastType, unknown> = {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	/* 24px — минимум, при котором цель попадает в палец на 16px-иконке.
+	   Цель выше строки сообщения, поэтому центрируем её по строке расчётом,
+	   а не подгонкой на глаз */
 	width: 24px;
 	height: 24px;
-	margin: -2px calc(-1 * var(--spacing-sm)) 0 0;
+	margin: calc((var(--toast-line) - 24px) / 2) calc(-1 * var(--spacing-sm)) 0 0;
 	padding: 0;
 	border: none;
 	border-radius: var(--border-radius-sm);
@@ -181,9 +213,18 @@ const icons: Record<ToastType, unknown> = {
 	transform: translateY(-8px);
 }
 
-/* Уезжающий тост выходит из потока, чтобы остальные не дёргались */
+/*
+ * Уезжающий тост выходит из потока, иначе он держал бы своё место до конца
+ * анимации, а потом остальные скакнули бы вверх. Ширину ему фиксирует
+ * freezeWidth() — без неё он пересчитывает её вне потока и текст переверстается.
+ */
 .app-toast-leave-active {
 	position: absolute;
+}
+
+/* Остальные тосты занимают освободившееся место плавно, а не рывком */
+.app-toast-move {
+	transition: transform var(--transition-base);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -195,6 +236,10 @@ const icons: Record<ToastType, unknown> = {
 	.app-toast-enter-from,
 	.app-toast-leave-to {
 		transform: none;
+	}
+
+	.app-toast-move {
+		transition: none;
 	}
 }
 </style>
