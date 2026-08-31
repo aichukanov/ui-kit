@@ -40,11 +40,11 @@ export default function uiKit(_options: unknown, nuxt: NuxtLike) {
 	// переопределить переменную своим файлом, а не наоборот.
 	nuxt.options.css.unshift(resolve(SRC, 'styles/tokens.css'));
 
-	// Компоненты доступны как <AppButton>, а не <UiAppButton>: имена в пакете
+	// Компоненты доступны как <KitButton>, а не <UiAppButton>: имена в пакете
 	// уже несут префикс App, второй от папки не нужен.
 	//
 	// Иконки намеренно НЕ регистрируются автоимпортом: в приложении есть свой
-	// набор `components/icon/` с теми же именами (IconClose и т.п.), коллизия
+	// набор `components/icon/` с теми же именами (KitIconClose и т.п.), коллизия
 	// разрешалась бы молча и непредсказуемо. Иконки пакета импортируются явно.
 	nuxt.hook('components:dirs', (dirs) => {
 		dirs.push({

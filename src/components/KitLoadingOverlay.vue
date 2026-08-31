@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import IconSpinner from '../icons/icon-spinner.vue';
+import KitIconSpinner from '../icons/icon-spinner.vue';
 
 /**
  * Замена директивы `v-loading`: обёртка вокруг блока, который перезагружается
@@ -20,12 +20,12 @@ withDefaults(
 </script>
 
 <template>
-	<div class="app-loading-overlay" :aria-busy="loading || undefined">
+	<div class="kit-loading-overlay" :aria-busy="loading || undefined">
 		<slot />
-		<Transition name="app-loading-fade">
-			<div v-if="loading" class="app-loading-overlay__veil">
-				<span class="app-loading-overlay__spinner"><IconSpinner /></span>
-				<span v-if="label" class="app-loading-overlay__label">
+		<Transition name="kit-loading-fade">
+			<div v-if="loading" class="kit-loading-overlay__veil">
+				<span class="kit-loading-overlay__spinner"><KitIconSpinner /></span>
+				<span v-if="label" class="kit-loading-overlay__label">
 					{{ label }}
 				</span>
 			</div>
@@ -34,44 +34,44 @@ withDefaults(
 </template>
 
 <style scoped>
-.app-loading-overlay {
+.kit-loading-overlay {
 	position: relative;
 }
 
-.app-loading-overlay__veil {
+.kit-loading-overlay__veil {
 	position: absolute;
 	inset: 0;
-	z-index: var(--z-raised);
+	z-index: var(--kit-z-raised);
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: var(--spacing-sm);
+	gap: var(--kit-spacing-sm);
 	/*
 	 * Полупрозрачная вуаль: под ней виден прежний контент, но клики по нему
 	 * перехватываются — иначе можно нажать на элемент, который сейчас заменят.
 	 */
 	background-color: rgb(255 255 255 / 75%);
-	color: var(--color-primary);
+	color: var(--kit-color-primary);
 }
 
-.app-loading-overlay__spinner {
+.kit-loading-overlay__spinner {
 	display: inline-flex;
-	font-size: var(--font-size-3xl);
+	font-size: var(--kit-font-size-3xl);
 }
 
-.app-loading-overlay__label {
-	color: var(--color-text-secondary);
-	font-size: var(--font-size-sm);
+.kit-loading-overlay__label {
+	color: var(--kit-color-text-secondary);
+	font-size: var(--kit-font-size-sm);
 }
 
-.app-loading-fade-enter-active,
-.app-loading-fade-leave-active {
-	transition: opacity var(--transition-base);
+.kit-loading-fade-enter-active,
+.kit-loading-fade-leave-active {
+	transition: opacity var(--kit-transition-base);
 }
 
-.app-loading-fade-enter-from,
-.app-loading-fade-leave-to {
+.kit-loading-fade-enter-from,
+.kit-loading-fade-leave-to {
 	opacity: 0;
 }
 </style>

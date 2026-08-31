@@ -15,58 +15,58 @@ withDefaults(
 </script>
 
 <template>
-	<div class="app-empty" :class="`app-empty--${size}`">
-		<div v-if="$slots.icon" class="app-empty__icon">
+	<div class="kit-empty" :class="`kit-empty--${size}`">
+		<div v-if="$slots.icon" class="kit-empty__icon">
 			<slot name="icon" />
 		</div>
-		<p v-if="description || $slots.default" class="app-empty__description">
+		<p v-if="description || $slots.default" class="kit-empty__description">
 			<slot>{{ description }}</slot>
 		</p>
-		<div v-if="$slots.action" class="app-empty__action">
+		<div v-if="$slots.action" class="kit-empty__action">
 			<slot name="action" />
 		</div>
 	</div>
 </template>
 
 <style scoped>
-.app-empty {
+.kit-empty {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: var(--spacing-md);
+	gap: var(--kit-spacing-md);
 	text-align: center;
-	color: var(--color-text-muted);
+	color: var(--kit-color-text-muted);
 }
 
-.app-empty--default {
-	padding: var(--spacing-3xl) var(--spacing-lg);
+.kit-empty--default {
+	padding: var(--kit-spacing-3xl) var(--kit-spacing-lg);
 }
 
-.app-empty--small {
-	padding: var(--spacing-xl) var(--spacing-lg);
+.kit-empty--small {
+	padding: var(--kit-spacing-xl) var(--kit-spacing-lg);
 }
 
-.app-empty__icon {
+.kit-empty__icon {
 	display: inline-flex;
-	color: var(--color-text-light);
+	color: var(--kit-color-text-light);
 }
 
-.app-empty--default .app-empty__icon {
+.kit-empty--default .kit-empty__icon {
 	font-size: 48px;
 }
 
-.app-empty--small .app-empty__icon {
+.kit-empty--small .kit-empty__icon {
 	font-size: 32px;
 }
 
-.app-empty__description {
+.kit-empty__description {
 	margin: 0;
 	max-width: 42ch;
-	font-size: var(--font-size-base);
+	font-size: var(--kit-font-size-base);
 	line-height: 1.5;
 }
 
-.app-empty--small .app-empty__description {
-	font-size: var(--font-size-sm);
+.kit-empty--small .kit-empty__description {
+	font-size: var(--kit-font-size-sm);
 }
 </style>

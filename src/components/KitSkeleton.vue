@@ -31,84 +31,84 @@ withDefaults(
 	-->
 	<div
 		v-if="variant === 'text' && rows > 1"
-		class="app-skeleton-rows"
+		class="kit-skeleton-rows"
 		aria-hidden="true"
 	>
 		<span
 			v-for="row in rows"
 			:key="row"
-			class="app-skeleton app-skeleton--text"
+			class="kit-skeleton kit-skeleton--text"
 			:class="{ 'is-animated': animated, 'is-last': row === rows }"
 		/>
 	</div>
 	<span
 		v-else
-		class="app-skeleton"
-		:class="[`app-skeleton--${variant}`, { 'is-animated': animated }]"
+		class="kit-skeleton"
+		:class="[`kit-skeleton--${variant}`, { 'is-animated': animated }]"
 		:style="{ width: width || undefined, height: height || undefined }"
 		aria-hidden="true"
 	/>
 </template>
 
 <style scoped>
-.app-skeleton {
+.kit-skeleton {
 	display: block;
-	background-color: var(--color-bg-muted);
-	border-radius: var(--border-radius-sm);
+	background-color: var(--kit-color-bg-muted);
+	border-radius: var(--kit-border-radius-sm);
 }
 
-.app-skeleton--text {
+.kit-skeleton--text {
 	height: 1em;
 	width: 100%;
 }
 
-.app-skeleton--heading {
+.kit-skeleton--heading {
 	height: 1.5em;
 	width: 60%;
 }
 
-.app-skeleton--image {
+.kit-skeleton--image {
 	height: 160px;
 	width: 100%;
-	border-radius: var(--border-radius-lg);
+	border-radius: var(--kit-border-radius-lg);
 }
 
-.app-skeleton--circle {
+.kit-skeleton--circle {
 	height: 40px;
 	width: 40px;
-	border-radius: var(--border-radius-full);
+	border-radius: var(--kit-border-radius-full);
 }
 
-.app-skeleton--button {
+.kit-skeleton--button {
 	height: 32px;
 	width: 96px;
-	border-radius: var(--border-radius-md);
+	border-radius: var(--kit-border-radius-md);
 }
 
-.app-skeleton-rows {
+.kit-skeleton-rows {
 	display: flex;
 	flex-direction: column;
-	gap: var(--spacing-sm);
+	gap: var(--kit-spacing-sm);
 }
 
 /* Последняя строка короче — блок читается как абзац текста */
-.app-skeleton-rows .is-last {
+.kit-skeleton-rows .is-last {
 	width: 60%;
 }
 
-.app-skeleton.is-animated {
+.kit-skeleton.is-animated {
 	/* Блик по градиенту вместо пульсации яркости: спокойнее для глаз */
 	background-image: linear-gradient(
 		90deg,
 		transparent 25%,
-		var(--color-bg-tertiary) 37%,
+		var(--kit-color-bg-tertiary) 37%,
 		transparent 63%
 	);
 	background-size: 400% 100%;
-	animation: app-skeleton-shimmer 1.4s ease-in-out infinite;
+	animation: kit-skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
-@keyframes app-skeleton-shimmer {
+@keyframes kit-skeleton-shimmer {
 	from {
 		background-position: 100% 50%;
 	}
@@ -119,7 +119,7 @@ withDefaults(
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.app-skeleton.is-animated {
+	.kit-skeleton.is-animated {
 		background-image: none;
 		animation: none;
 	}

@@ -20,71 +20,71 @@
 /* :root:root — удвоенная специфичность, чтобы переопределить дефолтные
    --el-* независимо от порядка загрузки CSS Element Plus */
 :root:root {
-	--el-color-primary: var(--color-primary);
+	--el-color-primary: var(--kit-color-primary);
 	--el-color-primary-light-3: #6366f1;
 	--el-color-primary-light-5: #818cf8;
-	--el-color-primary-light-7: var(--color-primary-light);
+	--el-color-primary-light-7: var(--kit-color-primary-light);
 	--el-color-primary-light-8: #c7d2fe;
 	--el-color-primary-light-9: #e0e7ff;
-	--el-color-primary-dark-2: var(--color-primary-dark);
+	--el-color-primary-dark-2: var(--kit-color-primary-dark);
 
-	--el-color-success: var(--color-success);
-	--el-color-warning: var(--color-warning);
-	--el-color-danger: var(--color-danger);
-	--el-color-error: var(--color-danger);
+	--el-color-success: var(--kit-color-success);
+	--el-color-warning: var(--kit-color-warning);
+	--el-color-danger: var(--kit-color-danger);
+	--el-color-error: var(--kit-color-danger);
 
-	--el-text-color-primary: var(--color-text-primary);
-	--el-text-color-regular: var(--color-text-secondary);
-	--el-text-color-secondary: var(--color-text-muted);
-	--el-text-color-placeholder: var(--color-text-placeholder);
+	--el-text-color-primary: var(--kit-color-text-primary);
+	--el-text-color-regular: var(--kit-color-text-secondary);
+	--el-text-color-secondary: var(--kit-color-text-muted);
+	--el-text-color-placeholder: var(--kit-color-text-placeholder);
 
-	--el-border-color: var(--color-border-primary);
-	--el-border-color-light: var(--color-border-secondary);
-	--el-border-color-lighter: var(--color-border-light);
+	--el-border-color: var(--kit-color-border-primary);
+	--el-border-color-light: var(--kit-color-border-secondary);
+	--el-border-color-lighter: var(--kit-color-border-light);
 
-	--el-border-radius-base: var(--border-radius-md);
-	--el-border-radius-small: var(--border-radius-sm);
+	--el-border-radius-base: var(--kit-border-radius-md);
+	--el-border-radius-small: var(--kit-border-radius-sm);
 
-	--el-box-shadow: var(--shadow-xl);
-	--el-box-shadow-light: var(--shadow-lg);
-	--el-box-shadow-lighter: var(--shadow-md);
-	--el-box-shadow-dark: var(--shadow-xl);
+	--el-box-shadow: var(--kit-shadow-xl);
+	--el-box-shadow-light: var(--kit-shadow-lg);
+	--el-box-shadow-lighter: var(--kit-shadow-md);
+	--el-box-shadow-dark: var(--kit-shadow-xl);
 
 	--el-font-family: system-ui, -apple-system, sans-serif;
 	/* 14px — стандартный размер контролов EP, привязан к шкале токенов */
-	--el-font-size-base: var(--font-size-sm);
+	--el-font-size-base: var(--kit-font-size-sm);
 }
 
 /*
  * Сплошные кнопки EP: белый текст на дефолтных фонах норму AA не держит
  * (danger 3.76:1, success 2.54:1, warning 2.15:1). Переводим их на те же
- * значения, что у AppButton, — иначе на одной странице соседствуют кнопка
+ * значения, что у KitButton, — иначе на одной странице соседствуют кнопка
  * дизайн-системы и кнопка EP разного цвета. plain/text/link не трогаем:
  * там цвет идёт по тексту, а не по заливке.
  */
 .el-button--danger:not(.is-plain):not(.is-text):not(.is-link) {
-	--el-button-bg-color: var(--color-danger-solid);
-	--el-button-border-color: var(--color-danger-solid);
-	--el-button-hover-bg-color: var(--color-danger-solid-hover);
-	--el-button-hover-border-color: var(--color-danger-solid-hover);
-	--el-button-active-bg-color: var(--color-danger-solid-active);
-	--el-button-active-border-color: var(--color-danger-solid-active);
+	--el-button-bg-color: var(--kit-color-danger-solid);
+	--el-button-border-color: var(--kit-color-danger-solid);
+	--el-button-hover-bg-color: var(--kit-color-danger-solid-hover);
+	--el-button-hover-border-color: var(--kit-color-danger-solid-hover);
+	--el-button-active-bg-color: var(--kit-color-danger-solid-active);
+	--el-button-active-border-color: var(--kit-color-danger-solid-active);
 }
 
 .el-button--success:not(.is-plain):not(.is-text):not(.is-link) {
-	--el-button-bg-color: var(--color-success-solid);
-	--el-button-border-color: var(--color-success-solid);
-	--el-button-hover-bg-color: var(--color-success-solid-hover);
-	--el-button-hover-border-color: var(--color-success-solid-hover);
-	--el-button-active-bg-color: var(--color-success-solid-active);
-	--el-button-active-border-color: var(--color-success-solid-active);
+	--el-button-bg-color: var(--kit-color-success-solid);
+	--el-button-border-color: var(--kit-color-success-solid);
+	--el-button-hover-bg-color: var(--kit-color-success-solid-hover);
+	--el-button-hover-border-color: var(--kit-color-success-solid-hover);
+	--el-button-active-bg-color: var(--kit-color-success-solid-active);
+	--el-button-active-border-color: var(--kit-color-success-solid-active);
 }
 
 .el-button--warning:not(.is-plain):not(.is-text):not(.is-link) {
-	--el-button-bg-color: var(--color-warning-solid);
-	--el-button-border-color: var(--color-warning-solid);
-	--el-button-hover-bg-color: var(--color-warning-solid-hover);
-	--el-button-hover-border-color: var(--color-warning-solid-hover);
-	--el-button-active-bg-color: var(--color-warning-solid-active);
-	--el-button-active-border-color: var(--color-warning-solid-active);
+	--el-button-bg-color: var(--kit-color-warning-solid);
+	--el-button-border-color: var(--kit-color-warning-solid);
+	--el-button-hover-bg-color: var(--kit-color-warning-solid-hover);
+	--el-button-hover-border-color: var(--kit-color-warning-solid-hover);
+	--el-button-active-bg-color: var(--kit-color-warning-solid-active);
+	--el-button-active-border-color: var(--kit-color-warning-solid-active);
 }

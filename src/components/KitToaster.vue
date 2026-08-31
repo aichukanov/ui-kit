@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import IconAlertCircle from '../icons/icon-alert-circle.vue';
-import IconAlertTriangle from '../icons/icon-alert-triangle.vue';
-import IconCheckCircle from '../icons/icon-check-circle.vue';
-import IconClose from '../icons/icon-close.vue';
-import IconInfo from '../icons/icon-info.vue';
+import KitIconAlertCircle from '../icons/icon-alert-circle.vue';
+import KitIconAlertTriangle from '../icons/icon-alert-triangle.vue';
+import KitIconCheckCircle from '../icons/icon-check-circle.vue';
+import KitIconClose from '../icons/icon-close.vue';
+import KitIconInfo from '../icons/icon-info.vue';
 import { useToastStack, type ToastType } from '../composables/use-toast';
 
 /**
@@ -21,10 +21,10 @@ withDefaults(
 const { toasts, dismiss } = useToastStack();
 
 const icons: Record<ToastType, unknown> = {
-	success: IconCheckCircle,
-	error: IconAlertCircle,
-	warning: IconAlertTriangle,
-	info: IconInfo,
+	success: KitIconCheckCircle,
+	error: KitIconAlertCircle,
+	warning: KitIconAlertTriangle,
+	info: KitIconInfo,
 };
 
 /**
@@ -61,29 +61,29 @@ function freezeSize(el: Element) {
 			polite, а не assertive, — тост не прерывает чтение страницы.
 		-->
 		<div
-			class="app-toaster"
+			class="kit-toaster"
 			role="status"
 			aria-live="polite"
 			aria-atomic="false"
 		>
-			<TransitionGroup name="app-toast" @before-leave="freezeSize">
+			<TransitionGroup name="kit-toast" @before-leave="freezeSize">
 				<div
 					v-for="toast in toasts"
 					:key="toast.id"
-					class="app-toast"
-					:class="`app-toast--${toast.type}`"
+					class="kit-toast"
+					:class="`kit-toast--${toast.type}`"
 				>
-					<span class="app-toast__icon">
+					<span class="kit-toast__icon">
 						<component :is="icons[toast.type]" />
 					</span>
-					<p class="app-toast__message">{{ toast.message }}</p>
+					<p class="kit-toast__message">{{ toast.message }}</p>
 					<button
 						type="button"
-						class="app-toast__close"
+						class="kit-toast__close"
 						:aria-label="closeLabel || undefined"
 						@click="dismiss(toast.id)"
 					>
-						<IconClose />
+						<KitIconClose />
 					</button>
 				</div>
 			</TransitionGroup>
@@ -92,93 +92,95 @@ function freezeSize(el: Element) {
 </template>
 
 <style scoped>
-.app-toaster {
+.kit-toaster {
 	position: fixed;
 	/* Ниже модалок, но выше всего остального: тост поверх открытого диалога */
-	z-index: var(--z-tooltip);
-	top: var(--spacing-lg);
+	z-index: var(--kit-z-tooltip);
+	top: var(--kit-spacing-lg);
 	/*
 	 * Контейнер растянут по окну, а тосты центрируются внутри него. Раньше он
 	 * был `width: max-content` со сдвигом на половину себя — и при удалении
 	 * тоста менял ширину, из-за чего остальные дёргались по горизонтали,
 	 * а уходящий (он вне потока) оставался у прежней координаты.
 	 */
-	left: var(--spacing-lg);
-	right: var(--spacing-lg);
+	left: var(--kit-spacing-lg);
+	right: var(--kit-spacing-lg);
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: var(--spacing-sm);
+	gap: var(--kit-spacing-sm);
 	/* Пустой контейнер не должен перехватывать клики по странице */
 	pointer-events: none;
 }
 
-.app-toast {
+.kit-toast {
 	/* Высота строки сообщения: по ней выравниваются иконка и крестик — они
 	   должны стоять на ПЕРВОЙ строке, а не по центру многострочного тоста */
-	--toast-line-height: 1.5;
-	--toast-line: calc(var(--font-size-sm) * var(--toast-line-height));
+	--kit-toast-line-height: 1.5;
+	--kit-toast-line: calc(
+		var(--kit-font-size-sm) * var(--kit-toast-line-height)
+	);
 
 	pointer-events: auto;
 	display: flex;
 	align-items: flex-start;
-	gap: var(--spacing-sm);
+	gap: var(--kit-spacing-sm);
 	box-sizing: border-box;
 	/* Контейнер во всю ширину окна, поэтому длинная ошибка растянулась бы
 	   на весь экран — ограничиваем комфортной длиной строки */
 	max-width: min(100%, 32rem);
-	padding: var(--spacing-md) var(--spacing-lg);
-	border: var(--border-width-thin) solid var(--toast-border);
-	border-radius: var(--border-radius-lg);
-	background-color: var(--toast-bg);
-	color: var(--toast-fg);
-	box-shadow: var(--shadow-lg);
-	font-size: var(--font-size-sm);
+	padding: var(--kit-spacing-md) var(--kit-spacing-lg);
+	border: var(--kit-border-width-thin) solid var(--kit-toast-border);
+	border-radius: var(--kit-border-radius-lg);
+	background-color: var(--kit-toast-bg);
+	color: var(--kit-toast-fg);
+	box-shadow: var(--kit-shadow-lg);
+	font-size: var(--kit-font-size-sm);
 }
 
 /* Цвет текста из *-solid: базовые success/warning на своей заливке дают ~2:1 */
-.app-toast--info {
-	--toast-bg: var(--color-bg-primary);
-	--toast-border: var(--color-border-secondary);
-	--toast-fg: var(--color-text-primary);
+.kit-toast--info {
+	--kit-toast-bg: var(--kit-color-bg-primary);
+	--kit-toast-border: var(--kit-color-border-secondary);
+	--kit-toast-fg: var(--kit-color-text-primary);
 }
 
-.app-toast--success {
-	--toast-bg: var(--color-success-bg);
-	--toast-border: var(--color-success-border);
-	--toast-fg: var(--color-success-solid);
+.kit-toast--success {
+	--kit-toast-bg: var(--kit-color-success-bg);
+	--kit-toast-border: var(--kit-color-success-border);
+	--kit-toast-fg: var(--kit-color-success-solid);
 }
 
-.app-toast--warning {
-	--toast-bg: var(--color-warning-bg);
-	--toast-border: var(--color-warning-border);
-	--toast-fg: var(--color-warning-solid);
+.kit-toast--warning {
+	--kit-toast-bg: var(--kit-color-warning-bg);
+	--kit-toast-border: var(--kit-color-warning-border);
+	--kit-toast-fg: var(--kit-color-warning-solid);
 }
 
-.app-toast--error {
-	--toast-bg: var(--color-danger-bg);
-	--toast-border: var(--color-danger-border);
-	--toast-fg: var(--color-danger-solid);
+.kit-toast--error {
+	--kit-toast-bg: var(--kit-color-danger-bg);
+	--kit-toast-border: var(--kit-color-danger-border);
+	--kit-toast-fg: var(--kit-color-danger-solid);
 }
 
-.app-toast__icon {
+.kit-toast__icon {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	flex-shrink: 0;
 	/* Бокс ростом в строку сообщения — иконка центрируется в нём сама */
-	height: var(--toast-line);
-	font-size: var(--font-size-base);
+	height: var(--kit-toast-line);
+	font-size: var(--kit-font-size-base);
 }
 
-.app-toast__message {
+.kit-toast__message {
 	margin: 0;
-	line-height: var(--toast-line-height);
+	line-height: var(--kit-toast-line-height);
 	/* Длинный текст ошибки должен переноситься, а не растягивать тост */
 	overflow-wrap: anywhere;
 }
 
-.app-toast__close {
+.kit-toast__close {
 	flex-shrink: 0;
 	display: inline-flex;
 	align-items: center;
@@ -188,37 +190,38 @@ function freezeSize(el: Element) {
 	   а не подгонкой на глаз */
 	width: 24px;
 	height: 24px;
-	margin: calc((var(--toast-line) - 24px) / 2) calc(-1 * var(--spacing-sm)) 0 0;
+	margin: calc((var(--kit-toast-line) - 24px) / 2)
+		calc(-1 * var(--kit-spacing-sm)) 0 0;
 	padding: 0;
 	border: none;
-	border-radius: var(--border-radius-sm);
+	border-radius: var(--kit-border-radius-sm);
 	background: transparent;
 	color: inherit;
-	font-size: var(--font-size-base);
+	font-size: var(--kit-font-size-base);
 	cursor: pointer;
 	opacity: 0.7;
-	transition: opacity var(--transition-base);
+	transition: opacity var(--kit-transition-base);
 }
 
-.app-toast__close:hover {
+.kit-toast__close:hover {
 	opacity: 1;
 }
 
-.app-toast__close:focus-visible {
+.kit-toast__close:focus-visible {
 	outline: 2px solid currentColor;
 	outline-offset: 1px;
 	opacity: 1;
 }
 
-.app-toast-enter-active,
-.app-toast-leave-active {
+.kit-toast-enter-active,
+.kit-toast-leave-active {
 	transition:
-		opacity var(--transition-base),
-		transform var(--transition-base);
+		opacity var(--kit-transition-base),
+		transform var(--kit-transition-base);
 }
 
-.app-toast-enter-from,
-.app-toast-leave-to {
+.kit-toast-enter-from,
+.kit-toast-leave-to {
 	opacity: 0;
 	transform: translateY(-8px);
 }
@@ -229,27 +232,27 @@ function freezeSize(el: Element) {
  * freezeSize() — без этого он пересчитывает раскладку вне потока и текст
  * переверстывается.
  */
-.app-toast-leave-active {
+.kit-toast-leave-active {
 	position: absolute;
 }
 
 /* Остальные тосты занимают освободившееся место плавно, а не рывком */
-.app-toast-move {
-	transition: transform var(--transition-base);
+.kit-toast-move {
+	transition: transform var(--kit-transition-base);
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.app-toast-enter-active,
-	.app-toast-leave-active {
-		transition: opacity var(--transition-base);
+	.kit-toast-enter-active,
+	.kit-toast-leave-active {
+		transition: opacity var(--kit-transition-base);
 	}
 
-	.app-toast-enter-from,
-	.app-toast-leave-to {
+	.kit-toast-enter-from,
+	.kit-toast-leave-to {
 		transform: none;
 	}
 
-	.app-toast-move {
+	.kit-toast-move {
 		transition: none;
 	}
 }

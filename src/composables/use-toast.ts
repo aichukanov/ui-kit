@@ -72,7 +72,7 @@ export function useToast() {
 	};
 }
 
-/** Для AppToaster — единственного легального читателя стека. */
+/** Для KitToaster — единственного легального читателя стека. */
 export function useToastStack() {
 	return { toasts, dismiss };
 }
