@@ -399,6 +399,11 @@ function onListScroll(e: Event) {
 		]"
 	>
 		<div class="kit-select__control" @click="toggle">
+			<!-- Иконка в поле: у селектора локации в шапке это пин -->
+			<span v-if="$slots.prefix" class="kit-select__prefix">
+				<slot name="prefix" />
+			</span>
+
 			<div class="kit-select__value">
 				<template v-if="multiple && hasValue">
 					<span
@@ -483,6 +488,12 @@ function onListScroll(e: Event) {
 				:class="{ 'kit-select--wrap': wrapLabels }"
 				:style="dropdownStyle"
 			>
+				<!-- Подсказка над списком: объясняет смысл выбора до того,
+					как пользователь начнёт выбирать -->
+				<div v-if="$slots.header" class="kit-select__header">
+					<slot name="header" />
+				</div>
+
 				<!-- Загрузка важнее пустоты: при remote список пуст, пока идёт запрос,
 					и «ничего не найдено» в этот момент было бы враньём -->
 				<div v-if="loading" class="kit-select__empty" role="status">
@@ -593,6 +604,21 @@ function onListScroll(e: Event) {
 .kit-select.is-disabled .kit-select__control {
 	background-color: var(--kit-color-bg-tertiary);
 	cursor: not-allowed;
+}
+
+.kit-select__prefix {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+	color: var(--kit-color-text-muted);
+}
+
+.kit-select__header {
+	padding: var(--kit-spacing-xs) var(--kit-spacing-md) var(--kit-spacing-sm);
+	border-bottom: var(--kit-border-width-thin) solid
+		var(--kit-color-border-light);
+	color: var(--kit-color-text-muted);
+	font-size: var(--kit-font-size-xs);
 }
 
 .kit-select__value {
