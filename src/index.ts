@@ -9,6 +9,7 @@ export { default as KitAlert } from './components/KitAlert.vue';
 export { default as KitButton } from './components/KitButton.vue';
 export { default as KitEmpty } from './components/KitEmpty.vue';
 export { default as KitLoadingOverlay } from './components/KitLoadingOverlay.vue';
+export { default as KitSelect } from './components/KitSelect.vue';
 export { default as KitSkeleton } from './components/KitSkeleton.vue';
 export { default as KitTag } from './components/KitTag.vue';
 export { default as KitToaster } from './components/KitToaster.vue';
