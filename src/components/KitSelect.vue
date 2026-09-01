@@ -40,6 +40,17 @@ const props = withDefaults(
 		wrapLabels?: boolean;
 		/** Сколько строк видно в раскрытом списке. */
 		visibleRows?: number;
+		/**
+		 * Поиск на сервере: список НЕ фильтруется локально, вместо этого
+		 * на каждый ввод летит событие `search`. Нужен там, где вариантов
+		 * больше, чем разумно грузить на клиент (пользователи, врачи).
+		 */
+		remote?: boolean;
+		/** Идёт загрузка вариантов (для remote). */
+		loading?: boolean;
+		loadingText?: string;
+		/** Сколько тегов показать в мультивыборе, остальные свернуть в «+N». */
+		maxTags?: number;
 	}>(),
 	{
 		multiple: false,
@@ -54,10 +65,16 @@ const props = withDefaults(
 		clearLabel: '',
 		wrapLabels: false,
 		visibleRows: 8,
+		remote: false,
+		loading: false,
+		loadingText: '',
+		maxTags: 0,
 	},
 );
 
 const model = defineModel<Value | Value[] | null>({ default: null });
+
+const emit = defineEmits<{ search: [query: string] }>();
 
 const uid = useId();
 const rootRef = ref<HTMLElement>();
@@ -92,11 +109,33 @@ const selectedOptions = computed(() =>
 	})),
 );
 
+/* Видимые теги и счётчик свёрнутых: иначе десяток городов ломает панель */
+const visibleTags = computed(() =>
+	props.maxTags > 0
+		? selectedOptions.value.slice(0, props.maxTags)
+		: selectedOptions.value,
+);
+
+const hiddenTagsCount = computed(() =>
+	Math.max(0, selectedOptions.value.length - visibleTags.value.length),
+);
+
+/* Полный список в подсказке — свёрнутые названия иначе не узнать */
+const hiddenTagsTitle = computed(() =>
+	selectedOptions.value
+		.slice(visibleTags.value.length)
+		.map((o) => o.label)
+		.join(', '),
+);
+
 /*
  * Фильтрация линейная по всему списку. На 8k строк это доли миллисекунды,
  * а индекс пришлось бы поддерживать при каждой смене options.
  */
 const filtered = computed(() => {
+	// При remote список уже отфильтрован сервером — фильтровать второй раз
+	// нельзя: сервер мог отобрать по полям, которых нет в подписи (email, id)
+	if (props.remote) return props.options;
 	const q = query.value.trim().toLowerCase();
 	if (!q) return props.options;
 	return props.options.filter((o) => o.label.toLowerCase().includes(q));
@@ -319,7 +358,8 @@ onBeforeUnmount(() => {
 });
 
 /* Фильтр сузился — прежний активный индекс уже ничего не значит */
-watch(query, () => {
+watch(query, (q) => {
+	if (props.remote) emit('search', q);
 	activeIndex.value = filtered.value.length ? 0 : -1;
 	scrollTop.value = 0;
 	if (listRef.value) listRef.value.scrollTop = 0;
@@ -362,7 +402,7 @@ function onListScroll(e: Event) {
 			<div class="kit-select__value">
 				<template v-if="multiple && hasValue">
 					<span
-						v-for="opt in selectedOptions"
+						v-for="opt in visibleTags"
 						:key="opt.value"
 						class="kit-select__tag"
 					>
@@ -375,6 +415,13 @@ function onListScroll(e: Event) {
 						>
 							<KitIconClose />
 						</button>
+					</span>
+					<span
+						v-if="hiddenTagsCount"
+						class="kit-select__tag kit-select__tag--more"
+						:title="hiddenTagsTitle"
+					>
+						+{{ hiddenTagsCount }}
 					</span>
 				</template>
 
@@ -433,9 +480,20 @@ function onListScroll(e: Event) {
 			<div
 				ref="dropdownRef"
 				class="kit-select__dropdown"
+				:class="{ 'kit-select--wrap': wrapLabels }"
 				:style="dropdownStyle"
 			>
-				<div v-if="!filtered.length" class="kit-select__empty" role="status">
+				<!-- Загрузка важнее пустоты: при remote список пуст, пока идёт запрос,
+					и «ничего не найдено» в этот момент было бы враньём -->
+				<div v-if="loading" class="kit-select__empty" role="status">
+					{{ loadingText }}
+				</div>
+
+				<div
+					v-else-if="!filtered.length"
+					class="kit-select__empty"
+					role="status"
+				>
 					{{ noDataText }}
 				</div>
 
@@ -474,6 +532,7 @@ function onListScroll(e: Event) {
 								top: `${row.index * rowHeight}px`,
 								height: `${rowHeight}px`,
 							}"
+							:title="row.option.label"
 							@click="pick(row.option)"
 							@mousemove="activeIndex = row.index"
 						>
@@ -668,10 +727,25 @@ function onListScroll(e: Event) {
 	padding: 0 var(--kit-spacing-md);
 	color: var(--kit-color-text-primary);
 	cursor: pointer;
-	/* Подписи в один ряд; для переноса есть wrapLabels с высокой строкой */
+	/*
+	 * По умолчанию подпись в одну строку с многоточием, полный текст —
+	 * нативной подсказкой (title): названия услуг длинные и в ширину панели
+	 * фильтров не влезают.
+	 */
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* wrapLabels: две строки вместо многоточия, под это и увеличена высота строки */
+.kit-select--wrap .kit-select__option {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	-webkit-box-orient: vertical;
+	white-space: normal;
+	line-height: 1.3;
+	text-overflow: unset;
 }
 
 .kit-select__option.is-active {
@@ -686,6 +760,12 @@ function onListScroll(e: Event) {
 .kit-select__option.is-disabled {
 	color: var(--kit-color-text-light);
 	cursor: not-allowed;
+}
+
+.kit-select__tag--more {
+	background-color: var(--kit-color-primary-bg);
+	color: var(--kit-color-primary);
+	cursor: default;
 }
 
 .kit-select__empty {
