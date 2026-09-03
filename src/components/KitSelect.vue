@@ -599,6 +599,7 @@ function onListScroll(e: Event) {
 .kit-select.is-open .kit-select__control,
 .kit-select__control:focus-within {
 	border-color: var(--kit-color-primary);
+	box-shadow: var(--kit-focus-ring);
 }
 
 .kit-select.is-disabled .kit-select__control {
@@ -728,7 +729,7 @@ function onListScroll(e: Event) {
 	z-index: var(--kit-z-dropdown);
 	padding: var(--kit-spacing-xs) 0;
 	border: var(--kit-border-width-thin) solid var(--kit-color-border-secondary);
-	border-radius: var(--kit-border-radius-md);
+	border-radius: var(--kit-border-radius-lg);
 	background-color: var(--kit-color-bg-primary);
 	box-shadow: var(--kit-shadow-lg);
 }
@@ -745,12 +746,15 @@ function onListScroll(e: Event) {
 
 .kit-select__option {
 	position: absolute;
-	left: 0;
-	right: 0;
+	/* Строка не касается стенок панели: подсветка активной строки — это
+	   скруглённая плашка внутри списка, а не полоса от края до края */
+	left: var(--kit-spacing-xs);
+	right: var(--kit-spacing-xs);
 	display: flex;
 	align-items: center;
 	box-sizing: border-box;
-	padding: 0 var(--kit-spacing-md);
+	padding: 0 var(--kit-spacing-sm);
+	border-radius: var(--kit-border-radius-sm);
 	color: var(--kit-color-text-primary);
 	cursor: pointer;
 	/*

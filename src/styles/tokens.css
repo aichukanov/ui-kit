@@ -59,7 +59,9 @@
 	--kit-color-text-on-solid: #ffffff;
 
 	--kit-color-text-heading: #0f172a;
-	--kit-color-text-primary: #333333;
+	/* Slate-800: единая шкала с заголовком и вторичным текстом; #333 был
+	   нейтрально-серым и на фоне slate выглядел грязнее. 14.6:1 на белом */
+	--kit-color-text-primary: #1e293b;
 	--kit-color-text-secondary: #475569;
 	--kit-color-text-muted: #64748b;
 	--kit-color-text-light: #94a3b8;
@@ -86,13 +88,20 @@
 		rgba(6, 182, 212, 0.04) 100%
 	);
 
-	--kit-color-border-primary: #d1d5db;
-	--kit-color-border-secondary: #e5e7eb;
-	--kit-color-border-light: #f3f4f6;
+	/* Границы на slate-шкале (300/200/100) — той же, что фоны bg-*: серые
+	   #d1d5db/#e5e7eb/#f3f4f6 из другой палитры рядом с ними отдавали жёлтым */
+	--kit-color-border-primary: #cbd5e1;
+	--kit-color-border-secondary: #e2e8f0;
+	--kit-color-border-light: #f1f5f9;
 	--kit-color-border-accent: rgba(79, 70, 229, 0.3);
 
 	--kit-color-surface-primary: var(--kit-color-bg-primary);
 	--kit-color-surface-secondary: var(--kit-color-bg-secondary);
+
+	/* Кольцо фокуса вокруг полей ввода и комбобоксов: рамка становится
+	   primary, а вокруг — полупрозрачный ореол. У кнопок остаётся outline:
+	   на сплошной заливке ореол того же цвета неразличим */
+	--kit-focus-ring: 0 0 0 3px rgb(79 70 229 / 20%);
 
 	/* === РАЗМЕРЫ === */
 	--kit-spacing-xs: 0.25rem; /* 4px */
@@ -105,6 +114,12 @@
 	--kit-spacing-4xl: 4rem; /* 64px */
 
 	/* === ТИПОГРАФИКА === */
+	/* Системный стек: без веб-шрифта, но с явными фолбэками — голый system-ui
+	   на Linux и в старых WebView даёт случайную гарнитуру */
+	--kit-font-family:
+		system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+		sans-serif;
+
 	/* База 16px (1rem) — доступность и отсутствие авто-зума инпутов на iOS */
 	--kit-font-size-xs: 0.75rem; /* 12px */
 	--kit-font-size-sm: 0.875rem; /* 14px */
@@ -134,19 +149,26 @@
 	--kit-border-width-thin: 1px;
 	--kit-border-width-thick: 3px;
 
-	--kit-border-radius-sm: 4px;
-	--kit-border-radius-md: 6px;
-	--kit-border-radius-lg: 8px;
-	--kit-border-radius-xl: 12px;
+	/* Шкала 6/8/12/16: контролы — md, карточки — lg, крупные панели и
+	   модалки — xl. Прежние 4/6/8/12 — метрики Element Plus 2020 года */
+	--kit-border-radius-sm: 6px;
+	--kit-border-radius-md: 8px;
+	--kit-border-radius-lg: 12px;
+	--kit-border-radius-xl: 16px;
+	--kit-border-radius-pill: 999px;
 	--kit-border-radius-full: 50%;
 
 	/* === ТЕНИ === */
-	--kit-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-	--kit-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-	--kit-shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08);
-	--kit-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
-	--kit-shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.12);
-	--kit-shadow-hover: 0 2px 8px rgba(79, 70, 229, 0.15);
+	/* Тени в цвете slate-900, а не чёрные: чёрная тень на slate-фонах
+	   сереет. От sm и выше — два слоя: короткий контактный + длинный
+	   рассеянный, так объём читается без грязного ореола */
+	--kit-shadow-xs: 0 1px 2px rgb(15 23 42 / 4%);
+	--kit-shadow-sm: 0 1px 2px rgb(15 23 42 / 4%), 0 1px 3px rgb(15 23 42 / 6%);
+	--kit-shadow-md: 0 2px 4px rgb(15 23 42 / 4%), 0 4px 12px rgb(15 23 42 / 6%);
+	--kit-shadow-lg: 0 4px 8px rgb(15 23 42 / 4%), 0 12px 24px rgb(15 23 42 / 8%);
+	--kit-shadow-xl:
+		0 8px 16px rgb(15 23 42 / 6%), 0 24px 48px rgb(15 23 42 / 10%);
+	--kit-shadow-hover: 0 4px 14px rgb(79 70 229 / 14%);
 	--kit-shadow-success-glow: 0 0 0 3px rgba(16, 185, 129, 0.2);
 	--kit-shadow-soft: 0 0 0 1px rgba(0, 0, 0, 0.06);
 

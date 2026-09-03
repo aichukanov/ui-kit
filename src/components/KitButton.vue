@@ -69,9 +69,11 @@ withDefaults(
  */
 .kit-button {
 	--kit-button-fill: var(--kit-color-bg-primary);
-	--kit-button-fill-hover: var(--kit-color-primary-bg);
-	--kit-button-fill-active: var(--kit-color-primary-bg);
+	--kit-button-fill-hover: var(--kit-color-bg-secondary);
+	--kit-button-fill-active: var(--kit-color-bg-tertiary);
 	--kit-button-accent: var(--kit-color-text-secondary);
+	/* Бледная подложка варианта: ховер контурных и текстовых кнопок */
+	--kit-button-tint: var(--kit-color-bg-tertiary);
 
 	display: inline-flex;
 	align-items: center;
@@ -81,7 +83,7 @@ withDefaults(
 	border: var(--kit-border-width-thin) solid transparent;
 	border-radius: var(--kit-border-radius-md);
 	font-family: inherit;
-	font-weight: var(--kit-font-weight-normal);
+	font-weight: var(--kit-font-weight-medium);
 	line-height: 1;
 	white-space: nowrap;
 	text-decoration: none;
@@ -89,7 +91,8 @@ withDefaults(
 	transition:
 		background-color var(--kit-transition-base),
 		border-color var(--kit-transition-base),
-		color var(--kit-transition-base);
+		color var(--kit-transition-base),
+		box-shadow var(--kit-transition-base);
 }
 
 .kit-button--variant-primary {
@@ -97,6 +100,7 @@ withDefaults(
 	--kit-button-fill-hover: var(--kit-color-primary-solid-hover);
 	--kit-button-fill-active: var(--kit-color-primary-solid-active);
 	--kit-button-accent: var(--kit-color-primary);
+	--kit-button-tint: var(--kit-color-primary-bg);
 }
 
 .kit-button--variant-success {
@@ -104,6 +108,7 @@ withDefaults(
 	--kit-button-fill-hover: var(--kit-color-success-solid-hover);
 	--kit-button-fill-active: var(--kit-color-success-solid-active);
 	--kit-button-accent: var(--kit-color-success-solid);
+	--kit-button-tint: var(--kit-color-success-bg);
 }
 
 .kit-button--variant-warning {
@@ -111,6 +116,7 @@ withDefaults(
 	--kit-button-fill-hover: var(--kit-color-warning-solid-hover);
 	--kit-button-fill-active: var(--kit-color-warning-solid-active);
 	--kit-button-accent: var(--kit-color-warning-solid);
+	--kit-button-tint: var(--kit-color-warning-bg);
 }
 
 .kit-button--variant-danger {
@@ -118,6 +124,7 @@ withDefaults(
 	--kit-button-fill-hover: var(--kit-color-danger-solid-hover);
 	--kit-button-fill-active: var(--kit-color-danger-solid-active);
 	--kit-button-accent: var(--kit-color-danger-solid);
+	--kit-button-tint: var(--kit-color-danger-bg);
 }
 
 /* Обводка снаружи рамки: на сплошной заливке контур внутри неразличим */
@@ -137,7 +144,7 @@ withDefaults(
 }
 
 .kit-button.is-round {
-	border-radius: 999px;
+	border-radius: var(--kit-border-radius-pill);
 }
 
 .kit-button__icon {
@@ -151,7 +158,7 @@ withDefaults(
 	height: 24px;
 	padding: 0 11px;
 	font-size: var(--kit-font-size-xs);
-	border-radius: calc(var(--kit-border-radius-md) - 1px);
+	border-radius: var(--kit-border-radius-sm);
 }
 
 .kit-button--size-default {
@@ -171,6 +178,9 @@ withDefaults(
 	background-color: var(--kit-button-fill);
 	border-color: var(--kit-button-fill);
 	color: var(--kit-color-text-on-solid);
+	/* Едва заметная контактная тень отделяет кнопку от карточки того же
+	   тона; у text/link её нет — они часть текста, а не объект */
+	box-shadow: var(--kit-shadow-xs);
 }
 
 .kit-button--solid:hover:not(:disabled) {
@@ -181,11 +191,14 @@ withDefaults(
 .kit-button--solid:active:not(:disabled) {
 	background-color: var(--kit-button-fill-active);
 	border-color: var(--kit-button-fill-active);
+	box-shadow: none;
 }
 
 /*
  * variant="default" не имеет своего цвета, поэтому его сплошной вид — это
- * белая кнопка с рамкой (так же выглядит нейтральная кнопка Element Plus).
+ * белая кнопка с рамкой. Ховер нейтральный (на полтона темнее), а не
+ * индиго, как у Element Plus: второстепенная кнопка не должна при наведении
+ * притворяться главной.
  */
 .kit-button--solid.kit-button--variant-default,
 .kit-button--plain.kit-button--variant-default {
@@ -196,18 +209,24 @@ withDefaults(
 
 .kit-button--solid.kit-button--variant-default:hover:not(:disabled),
 .kit-button--plain.kit-button--variant-default:hover:not(:disabled) {
-	background-color: var(--kit-color-primary-bg);
-	border-color: var(--kit-color-primary);
-	color: var(--kit-color-primary);
+	background-color: var(--kit-color-bg-secondary);
+	border-color: var(--kit-color-text-light);
+	color: var(--kit-color-text-heading);
 }
 
 .kit-button--solid.kit-button--variant-default:active:not(:disabled),
 .kit-button--plain.kit-button--variant-default:active:not(:disabled) {
-	border-color: var(--kit-color-primary-dark);
-	color: var(--kit-color-primary-dark);
+	background-color: var(--kit-color-bg-tertiary);
+	border-color: var(--kit-color-text-light);
+	color: var(--kit-color-text-heading);
 }
 
-/* === appearance: plain — контур, заливающийся при наведении === */
+/*
+ * === appearance: plain — контур, при наведении подсвечивается бледной
+ * подложкой своего цвета. Полная заливка на ховере (манера Element Plus)
+ * превращала контурную кнопку в сплошную — два веса становились
+ * неразличимы ровно в момент, когда пользователь на них смотрит.
+ */
 .kit-button--plain {
 	background-color: var(--kit-color-bg-primary);
 	border-color: var(--kit-button-accent);
@@ -215,15 +234,13 @@ withDefaults(
 }
 
 .kit-button--plain:hover:not(:disabled) {
-	background-color: var(--kit-button-fill);
-	border-color: var(--kit-button-fill);
-	color: var(--kit-color-text-on-solid);
+	background-color: var(--kit-button-tint);
 }
 
 .kit-button--plain:active:not(:disabled) {
-	background-color: var(--kit-button-fill-active);
+	background-color: var(--kit-button-tint);
 	border-color: var(--kit-button-fill-active);
-	color: var(--kit-color-text-on-solid);
+	color: var(--kit-button-fill-active);
 }
 
 /* === appearance: text — без рамки и фона === */
@@ -234,7 +251,11 @@ withDefaults(
 }
 
 .kit-button--text:hover:not(:disabled) {
-	background-color: var(--kit-color-bg-tertiary);
+	background-color: var(--kit-button-tint);
+}
+
+.kit-button--text:active:not(:disabled) {
+	color: var(--kit-button-fill-active);
 }
 
 /* === appearance: link — ведёт себя как ссылка в тексте === */

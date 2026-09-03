@@ -44,13 +44,14 @@
 
 	--el-border-radius-base: var(--kit-border-radius-md);
 	--el-border-radius-small: var(--kit-border-radius-sm);
+	--el-border-radius-round: var(--kit-border-radius-pill);
 
 	--el-box-shadow: var(--kit-shadow-xl);
 	--el-box-shadow-light: var(--kit-shadow-lg);
 	--el-box-shadow-lighter: var(--kit-shadow-md);
 	--el-box-shadow-dark: var(--kit-shadow-xl);
 
-	--el-font-family: system-ui, -apple-system, sans-serif;
+	--el-font-family: var(--kit-font-family);
 	/* 14px — стандартный размер контролов EP, привязан к шкале токенов */
 	--el-font-size-base: var(--kit-font-size-sm);
 }
@@ -87,4 +88,38 @@
 	--el-button-hover-border-color: var(--kit-color-warning-solid-hover);
 	--el-button-active-bg-color: var(--kit-color-warning-solid-active);
 	--el-button-active-border-color: var(--kit-color-warning-solid-active);
+}
+
+/*
+ * Нейтральная кнопка EP при наведении становилась индиго (текст primary,
+ * заливка light-9) — второстепенное действие притворялось главным. KitButton
+ * с variant="default" темнеет на полтона; выравниваем EP под него, иначе две
+ * соседние «Показать на карте» ведут себя по-разному. Цветные типы и
+ * text/link не трогаем — там цвет несёт смысл.
+ *
+ * Тип default модификатора не получает (класс просто .el-button), а размерные
+ * классы тоже начинаются с el-button--, поэтому исключаем типы поимённо.
+ */
+.el-button:not(.el-button--primary):not(.el-button--success):not(
+		.el-button--warning
+	):not(.el-button--danger):not(.el-button--info):not(.is-text):not(.is-link) {
+	--el-button-hover-text-color: var(--kit-color-text-heading);
+	--el-button-hover-bg-color: var(--kit-color-bg-secondary);
+	--el-button-hover-border-color: var(--kit-color-text-light);
+	--el-button-active-text-color: var(--kit-color-text-heading);
+	--el-button-active-bg-color: var(--kit-color-bg-tertiary);
+	--el-button-active-border-color: var(--kit-color-text-light);
+}
+
+/*
+ * Кольцо фокуса у полей ввода — то же, что у KitSelect: рамка primary плюс
+ * полупрозрачный ореол. У EP фокус обозначен только сменой цвета
+ * однопиксельной рамки, и на светлом фоне он почти не читается.
+ */
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus,
+.el-select__wrapper.is-focused {
+	box-shadow:
+		0 0 0 1px var(--el-input-focus-border-color, var(--kit-color-primary)) inset,
+		var(--kit-focus-ring);
 }

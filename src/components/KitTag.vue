@@ -54,6 +54,7 @@ withDefaults(
 	box-sizing: border-box;
 	border: var(--kit-border-width-thin) solid transparent;
 	border-radius: var(--kit-border-radius-sm);
+	font-weight: var(--kit-font-weight-medium);
 	line-height: 1;
 	white-space: nowrap;
 }
@@ -106,13 +107,17 @@ withDefaults(
 }
 
 .kit-tag.is-round {
-	border-radius: 999px;
+	border-radius: var(--kit-border-radius-pill);
 }
 
-/* === appearance === */
+/*
+ * === appearance ===
+ * light — без рамки: заливка сама очерчивает метку, а рамка поверх бледной
+ * заливки (манера Element Plus) утяжеляла её и рябила в ряду из нескольких
+ * меток. --kit-tag-border остаётся для plain.
+ */
 .kit-tag--light {
 	background-color: var(--kit-tag-bg);
-	border-color: var(--kit-tag-border);
 	color: var(--kit-tag-fg);
 }
 
