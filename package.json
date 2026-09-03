@@ -18,6 +18,7 @@
 		"./tokens.css": "./src/styles/tokens.css",
 		"./element-plus-bridge.css": "./src/styles/element-plus-bridge.css",
 		"./components/*": "./src/components/*",
+		"./avatar-colors": "./src/avatar-colors.ts",
 		"./icons": "./src/icons/index.ts",
 		"./icons/*": "./src/icons/*"
 	},
