@@ -89,7 +89,7 @@ const scrollTop = ref(0);
 const dropdownStyle = ref<Record<string, string>>({});
 
 /* Высота строки согласована с CSS: JS считает окно, CSS рисует. */
-const rowHeight = computed(() => (props.wrapLabels ? 52 : 34));
+const rowHeight = computed(() => (props.wrapLabels ? 52 : 36));
 
 const selectedValues = computed<Value[]>(() => {
 	if (model.value === null || model.value === undefined) return [];
@@ -143,8 +143,23 @@ const filtered = computed(() => {
 
 const hasValue = computed(() => selectedValues.value.length > 0);
 
+/*
+ * Сколько строк влезает в окно браузера с той стороны, куда открыта панель.
+ * Считается в place(): при зуме или низком окне восемь строк не помещаются,
+ * и без этого ограничения панель уезжала за край экрана.
+ */
+const rowsThatFit = ref(Infinity);
+
+/* Меньше трёх строк список перестаёт быть списком — дальше не ужимаем */
+const MIN_ROWS = 3;
+
 const viewportHeight = computed(
-	() => Math.min(filtered.value.length, props.visibleRows) * rowHeight.value,
+	() =>
+		Math.min(
+			filtered.value.length,
+			props.visibleRows,
+			Math.max(MIN_ROWS, rowsThatFit.value),
+		) * rowHeight.value,
 );
 
 /* Окно видимых строк + запас сверху и снизу, чтобы не мигало при прокрутке */
@@ -179,24 +194,74 @@ function isSelected(value: Value) {
 
 /* --- позиционирование --------------------------------------------------- */
 
+/* Зазор между триггером и панелью */
+const GAP = 4;
+
 /*
  * Позиция считается от прямоугольника триггера, без popper: список
  * фиксированный, ему нужно лишь перевернуться вверх, когда снизу не влезает.
+ *
+ * Сторону выбираем по свободному месту, а число строк подгоняем под неё:
+ * панель никогда не выходит за окно. Когда триггер исчез из раскладки
+ * (перестроение по брейкпоинту, закрытый аккордеон), панель закрываем —
+ * иначе она висит в углу окна без хозяина.
  */
 function place() {
 	const el = rootRef.value;
 	if (!el) return;
 	const r = el.getBoundingClientRect();
-	const height = viewportHeight.value + 8;
-	const below = window.innerHeight - r.bottom;
-	const flip = below < height && r.top > below;
-	dropdownStyle.value = {
+	if (r.width === 0 && r.height === 0) {
+		close();
+		return;
+	}
+	// Всё, что в панели кроме списка: рамка, отступы, шапка со слотом
+	const chrome =
+		(dropdownRef.value?.offsetHeight ?? 0) -
+		(listRef.value?.offsetHeight ?? 0);
+	const wanted =
+		Math.min(filtered.value.length, props.visibleRows) * rowHeight.value +
+		chrome;
+	const below = window.innerHeight - r.bottom - GAP;
+	const above = r.top - GAP;
+	const flip = below < wanted && above > below;
+	const room = flip ? above : below;
+	rowsThatFit.value = Math.floor((room - chrome) / rowHeight.value);
+
+	const next = {
 		left: `${r.left}px`,
 		width: `${r.width}px`,
 		...(flip
-			? { bottom: `${window.innerHeight - r.top + 4}px` }
-			: { top: `${r.bottom + 4}px` }),
+			? { bottom: `${window.innerHeight - r.top + GAP}px` }
+			: { top: `${r.bottom + GAP}px` }),
 	};
+	// Панель следит за триггером покадрово — не дёргаем реактивность зря
+	const prev = dropdownStyle.value;
+	if (
+		prev.left !== next.left ||
+		prev.width !== next.width ||
+		prev.top !== next.top ||
+		prev.bottom !== next.bottom
+	) {
+		dropdownStyle.value = next;
+	}
+}
+
+/*
+ * Пока панель открыта, позиция пересчитывается каждый кадр. Событий scroll
+ * и resize недостаточно: раскладка сдвигается и без них — перестроение по
+ * брейкпоинту после зума, догрузившийся шрифт, раскрывшийся блок выше.
+ * Цена — один getBoundingClientRect на кадр, только пока список открыт.
+ */
+let trackingFrame = 0;
+
+function track() {
+	place();
+	trackingFrame = requestAnimationFrame(track);
+}
+
+function stopTracking() {
+	cancelAnimationFrame(trackingFrame);
+	trackingFrame = 0;
 }
 
 /* --- открытие и закрытие ------------------------------------------------ */
@@ -213,9 +278,8 @@ function open() {
 		place();
 		scrollActiveIntoView();
 		if (props.filterable) inputRef.value?.focus();
+		trackingFrame = requestAnimationFrame(track);
 	});
-	window.addEventListener('scroll', place, true);
-	window.addEventListener('resize', place);
 }
 
 function close() {
@@ -224,8 +288,8 @@ function close() {
 	query.value = '';
 	activeIndex.value = -1;
 	scrollTop.value = 0;
-	window.removeEventListener('scroll', place, true);
-	window.removeEventListener('resize', place);
+	rowsThatFit.value = Infinity;
+	stopTracking();
 }
 
 function toggle() {
@@ -233,10 +297,7 @@ function toggle() {
 	else open();
 }
 
-onBeforeUnmount(() => {
-	window.removeEventListener('scroll', place, true);
-	window.removeEventListener('resize', place);
-});
+onBeforeUnmount(stopTracking);
 
 /* --- выбор -------------------------------------------------------------- */
 
@@ -728,6 +789,9 @@ function onListScroll(e: Event) {
 	position: fixed;
 	z-index: var(--kit-z-dropdown);
 	padding: var(--kit-spacing-xs) 0;
+	/* Панель телепортирована в body и не наследует размер от .kit-select:
+	   без этого строки шли 16px от body и в свою высоту не помещались */
+	font-size: var(--kit-font-size-sm);
 	border: var(--kit-border-width-thin) solid var(--kit-color-border-secondary);
 	border-radius: var(--kit-border-radius-lg);
 	background-color: var(--kit-color-bg-primary);
@@ -753,7 +817,7 @@ function onListScroll(e: Event) {
 	display: flex;
 	align-items: center;
 	box-sizing: border-box;
-	padding: 0 var(--kit-spacing-sm);
+	padding: 0 var(--kit-spacing-md);
 	border-radius: var(--kit-border-radius-sm);
 	color: var(--kit-color-text-primary);
 	cursor: pointer;

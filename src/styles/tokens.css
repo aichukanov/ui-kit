@@ -180,8 +180,10 @@
 	--kit-z-base: 0;
 	--kit-z-raised: 100;
 	--kit-z-map: 1000;
-	--kit-z-dropdown: 1100;
 	--kit-z-header: 1200;
+	/* Выше шапки: панель селекта, перевёрнутая вверх при нехватке места снизу,
+	   иначе уходила под липкую шапку. Меню самой шапки остаются выше */
+	--kit-z-dropdown: 1250;
 	--kit-z-header-dropdown: 1300;
 	--kit-z-modal: 2000;
 	--kit-z-cookie-consent: 2500;
