@@ -10,8 +10,9 @@ import KitIconClose from '../icons/icon-close.vue';
  * раскрытие такого списка вешает вкладку на секунды.
  *
  * Высота строки ФИКСИРОВАННАЯ. Это ограничение осознанное: переменная высота
- * потребовала бы измерять каждую строку, а выигрыш — только в переносе длинных
- * подписей. Для них есть `rowHeight` побольше (см. `wrapLabels`).
+ * потребовала бы измерять каждую строку. Длинные подписи решаются вторым
+ * режимом — две строки на всём списке (`wrapLabels`); по умолчанию режим
+ * выбирается сам по самой длинной подписи и ширине панели.
  */
 
 type Value = string | number;
@@ -36,8 +37,11 @@ const props = withDefaults(
 		noDataText?: string;
 		ariaLabel?: string;
 		clearLabel?: string;
-		/** Переносить длинные подписи на вторую строку (строка станет выше). */
-		wrapLabels?: boolean;
+		/**
+		 * Переносить подписи на вторую строку (строка станет выше). 'auto' —
+		 * включается, если самая длинная подпись не помещается в ширину панели.
+		 */
+		wrapLabels?: boolean | 'auto';
 		/** Сколько строк видно в раскрытом списке. */
 		visibleRows?: number;
 		/**
@@ -63,7 +67,7 @@ const props = withDefaults(
 		noDataText: '',
 		ariaLabel: '',
 		clearLabel: '',
-		wrapLabels: false,
+		wrapLabels: 'auto',
 		visibleRows: 8,
 		remote: false,
 		loading: false,
@@ -88,8 +92,25 @@ const activeIndex = ref(-1);
 const scrollTop = ref(0);
 const dropdownStyle = ref<Record<string, string>>({});
 
+/*
+ * Автовыбор переноса: оценка по числу символов, а не по замеру текста —
+ * измерять 5000 подписей при каждом открытии дорого, а ошибка оценки стоит
+ * лишь лишнего воздуха в строках. Средняя ширина символа системного шрифта
+ * в 14px — около 7.7px (кириллица шире латиницы, берём её).
+ */
+const AVG_CHAR_WIDTH = 7.7;
+const autoWrap = ref(false);
+
+const longestLabel = computed(() =>
+	props.options.reduce((max, o) => Math.max(max, o.label.length), 0),
+);
+
+const wrap = computed(() =>
+	props.wrapLabels === 'auto' ? autoWrap.value : props.wrapLabels,
+);
+
 /* Высота строки согласована с CSS: JS считает окно, CSS рисует. */
-const rowHeight = computed(() => (props.wrapLabels ? 52 : 36));
+const rowHeight = computed(() => (wrap.value ? 52 : 36));
 
 const selectedValues = computed<Value[]>(() => {
 	if (model.value === null || model.value === undefined) return [];
@@ -214,10 +235,15 @@ function place() {
 		close();
 		return;
 	}
+	if (props.wrapLabels === 'auto') {
+		// Ширина текста строки: панель минус отступ строки от стенок (2×4)
+		// и внутренний паддинг строки (2×12)
+		const textWidth = r.width - 8 - 24;
+		autoWrap.value = longestLabel.value * AVG_CHAR_WIDTH > textWidth;
+	}
 	// Всё, что в панели кроме списка: рамка, отступы, шапка со слотом
 	const chrome =
-		(dropdownRef.value?.offsetHeight ?? 0) -
-		(listRef.value?.offsetHeight ?? 0);
+		(dropdownRef.value?.offsetHeight ?? 0) - (listRef.value?.offsetHeight ?? 0);
 	const wanted =
 		Math.min(filtered.value.length, props.visibleRows) * rowHeight.value +
 		chrome;
@@ -227,12 +253,14 @@ function place() {
 	const room = flip ? above : below;
 	rowsThatFit.value = Math.floor((room - chrome) / rowHeight.value);
 
-	const next = {
-		left: `${r.left}px`,
-		width: `${r.width}px`,
+	// Координаты округляем: на доле пикселя однопиксельная рамка размывается
+	// и с одной стороны выглядит толще, чем с другой
+	const next: Record<string, string> = {
+		left: `${Math.round(r.left)}px`,
+		width: `${Math.round(r.width)}px`,
 		...(flip
-			? { bottom: `${window.innerHeight - r.top + GAP}px` }
-			: { top: `${r.bottom + GAP}px` }),
+			? { bottom: `${Math.round(window.innerHeight - r.top + GAP)}px` }
+			: { top: `${Math.round(r.bottom + GAP)}px` }),
 	};
 	// Панель следит за триггером покадрово — не дёргаем реактивность зря
 	const prev = dropdownStyle.value;
@@ -309,6 +337,9 @@ function pick(option: Option) {
 			: [...selectedValues.value, option.value];
 		model.value = next;
 		query.value = '';
+		// Клик по строке уводит фокус из поля, и Escape/стрелки перестают
+		// работать, пока не кликнешь обратно. Возвращаем фокус сами.
+		inputRef.value?.focus();
 	} else {
 		model.value = option.value;
 		close();
@@ -437,6 +468,18 @@ const inputValue = computed(() => {
 	return selectedOptions.value[0]?.label ?? '';
 });
 
+/*
+ * Место поля ввода среди тегов. Пока список закрыт, поле не нужно —
+ * схлопываем до нуля, иначе оно с min-width переносилось на новую строку
+ * и контрол рос в высоту ради пустоты. В открытом списке с поиском поле
+ * занимает собственную строку во всю ширину: рядом с тегами плейсхолдер
+ * не помещался и обрезался.
+ */
+const inputLayout = computed(() => {
+	if (!props.multiple || !hasValue.value) return '';
+	return isOpen.value && props.filterable ? 'is-full-row' : 'is-collapsed';
+});
+
 const inputPlaceholder = computed(() => {
 	if (isOpen.value && props.filterable) {
 		return props.searchPlaceholder || props.placeholder;
@@ -494,6 +537,7 @@ function onListScroll(e: Event) {
 				<input
 					ref="inputRef"
 					class="kit-select__input"
+					:class="inputLayout"
 					role="combobox"
 					aria-autocomplete="list"
 					:aria-expanded="isOpen"
@@ -546,7 +590,7 @@ function onListScroll(e: Event) {
 			<div
 				ref="dropdownRef"
 				class="kit-select__dropdown"
-				:class="{ 'kit-select--wrap': wrapLabels }"
+				:class="{ 'kit-select--wrap': wrap }"
 				:style="dropdownStyle"
 			>
 				<!-- Подсказка над списком: объясняет смысл выбора до того,
@@ -608,7 +652,9 @@ function onListScroll(e: Event) {
 							@click="pick(row.option)"
 							@mousemove="activeIndex = row.index"
 						>
-							{{ row.option.label }}
+							<span class="kit-select__option-label">{{
+								row.option.label
+							}}</span>
 						</div>
 					</div>
 				</div>
@@ -719,6 +765,17 @@ function onListScroll(e: Event) {
 	color: var(--kit-color-text-placeholder);
 }
 
+.kit-select__input.is-collapsed {
+	flex: 0 0 0;
+	width: 0;
+	min-width: 0;
+	padding: 0;
+}
+
+.kit-select__input.is-full-row {
+	flex-basis: 100%;
+}
+
 .kit-select__tag {
 	display: inline-flex;
 	align-items: center;
@@ -788,6 +845,9 @@ function onListScroll(e: Event) {
 .kit-select__dropdown {
 	position: fixed;
 	z-index: var(--kit-z-dropdown);
+	/* Ширина панели задаётся по контролу и включает рамку — иначе панель
+	   на 2px шире и её рамка не совпадает с рамкой контрола */
+	box-sizing: border-box;
 	padding: var(--kit-spacing-xs) 0;
 	/* Панель телепортирована в body и не наследует размер от .kit-select:
 	   без этого строки шли 16px от body и в свою высоту не помещались */
@@ -821,18 +881,22 @@ function onListScroll(e: Event) {
 	border-radius: var(--kit-border-radius-sm);
 	color: var(--kit-color-text-primary);
 	cursor: pointer;
-	/*
-	 * По умолчанию подпись в одну строку с многоточием, полный текст —
-	 * нативной подсказкой (title): названия услуг длинные и в ширину панели
-	 * фильтров не влезают.
-	 */
+}
+
+/*
+ * Подпись — отдельный элемент, а не текст прямо в строке: строка — flex-
+ * контейнер, а text-overflow на flex-контейнере не работает, и длинные
+ * названия резались по краю без многоточия. Полный текст — в title строки.
+ */
+.kit-select__option-label {
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
 /* wrapLabels: две строки вместо многоточия, под это и увеличена высота строки */
-.kit-select--wrap .kit-select__option {
+.kit-select--wrap .kit-select__option-label {
 	display: -webkit-box;
 	-webkit-line-clamp: 2;
 	line-clamp: 2;
