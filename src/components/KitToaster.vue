@@ -26,31 +26,6 @@ const icons: Record<ToastType, unknown> = {
 	warning: KitIconAlertTriangle,
 	info: KitIconInfo,
 };
-
-/**
- * Замораживает размеры уходящего тоста.
- *
- * На уходе тост выводится из потока (`position: absolute` в `-leave-active`),
- * чтобы остальные плавно поднялись на его место. Но вне потока он теряет
- * ширину, полученную от флекс-контейнера, и пересчитывает её заново — текст
- * переверстывается, и тост «растягивается вниз» вместо того чтобы исчезнуть.
- * Размеры в пикселях известны только живому DOM, поэтому CSS здесь не помог бы.
- *
- * Ширина берётся из getBoundingClientRect, а НЕ из offsetWidth: тот округляет
- * до целого, и потерянной доли пикселя хватает, чтобы последнее слово
- * перескочило на новую строку. Ловилось только на сообщениях, чья длина
- * почти точно равна ширине строки.
- *
- * Высота фиксируется тоже — не потому, что известен сценарий, где она поедет
- * при верной ширине, а чтобы вывести из уравнения весь класс таких ошибок:
- * уходящий элемент не должен пересчитывать раскладку вообще.
- */
-function freezeSize(el: Element) {
-	const node = el as HTMLElement;
-	const rect = node.getBoundingClientRect();
-	node.style.width = `${rect.width}px`;
-	node.style.height = `${rect.height}px`;
-}
 </script>
 
 <template>
@@ -66,25 +41,29 @@ function freezeSize(el: Element) {
 			aria-live="polite"
 			aria-atomic="false"
 		>
-			<TransitionGroup name="kit-toast" @before-leave="freezeSize">
-				<div
-					v-for="toast in toasts"
-					:key="toast.id"
-					class="kit-toast"
-					:class="`kit-toast--${toast.type}`"
-				>
-					<span class="kit-toast__icon">
-						<component :is="icons[toast.type]" />
-					</span>
-					<p class="kit-toast__message">{{ toast.message }}</p>
-					<button
-						type="button"
-						class="kit-toast__close"
-						:aria-label="closeLabel || undefined"
-						@click="dismiss(toast.id)"
-					>
-						<KitIconClose />
-					</button>
+			<!--
+				Каждый тост лежит в своём слоте — сетке из одной строки. Уход
+				анимируется схлопыванием строки слота (1fr → 0fr), поэтому тост
+				остаётся в потоке до конца, а соседи съезжают плавно. Раньше
+				уходящий тост выводился из потока, и его размеры приходилось
+				замораживать скриптом — иначе текст переверстывался.
+			-->
+			<TransitionGroup name="kit-toast">
+				<div v-for="toast in toasts" :key="toast.id" class="kit-toast-slot">
+					<div class="kit-toast" :class="`kit-toast--${toast.type}`">
+						<span class="kit-toast__icon">
+							<component :is="icons[toast.type]" />
+						</span>
+						<p class="kit-toast__message">{{ toast.message }}</p>
+						<button
+							type="button"
+							class="kit-toast__close"
+							:aria-label="closeLabel || undefined"
+							@click="dismiss(toast.id)"
+						>
+							<KitIconClose />
+						</button>
+					</div>
 				</div>
 			</TransitionGroup>
 		</div>
@@ -113,6 +92,18 @@ function freezeSize(el: Element) {
 	pointer-events: none;
 }
 
+/*
+ * Слот — сетка из одной строки. Высота строки анимируется между 1fr и 0fr:
+ * так уход тоста схлопывает занятое им место без вывода из потока и без
+ * замера размеров в JS. Ширина слота — по тосту, но не шире удобной строки:
+ * контейнер во всю ширину окна, и длинная ошибка растянулась бы на весь экран.
+ */
+.kit-toast-slot {
+	display: grid;
+	grid-template-rows: 1fr;
+	max-width: min(100%, 32rem);
+}
+
 .kit-toast {
 	/* Высота строки сообщения: по ней выравниваются иконка и крестик — они
 	   должны стоять на ПЕРВОЙ строке, а не по центру многострочного тоста */
@@ -126,9 +117,8 @@ function freezeSize(el: Element) {
 	align-items: flex-start;
 	gap: var(--kit-spacing-sm);
 	box-sizing: border-box;
-	/* Контейнер во всю ширину окна, поэтому длинная ошибка растянулась бы
-	   на весь экран — ограничиваем комфортной длиной строки */
-	max-width: min(100%, 32rem);
+	/* Иначе строка сетки не смогла бы схлопнуться ниже высоты тоста */
+	min-height: 0;
 	padding: var(--kit-spacing-md) var(--kit-spacing-lg);
 	border: var(--kit-border-width-thin) solid var(--kit-toast-border);
 	border-radius: var(--kit-border-radius-lg);
@@ -216,27 +206,46 @@ function freezeSize(el: Element) {
 .kit-toast-enter-active,
 .kit-toast-leave-active {
 	transition:
+		grid-template-rows var(--kit-transition-base),
+		margin-bottom var(--kit-transition-base),
 		opacity var(--kit-transition-base),
 		transform var(--kit-transition-base);
 }
 
+/*
+ * Появление и уход — одна и та же форма: строка слота схлопнута, тост
+ * прозрачен и чуть выше своего места. Отрицательный нижний отступ съедает
+ * gap контейнера, иначе после схлопывания оставался бы пустой зазор,
+ * и соседи в конце подпрыгивали бы на его высоту.
+ */
 .kit-toast-enter-from,
 .kit-toast-leave-to {
+	grid-template-rows: 0fr;
+	margin-bottom: calc(-1 * var(--kit-spacing-sm));
 	opacity: 0;
 	transform: translateY(-8px);
 }
 
 /*
- * Уезжающий тост выходит из потока, иначе он держал бы своё место до конца
- * анимации, а потом остальные скакнули бы вверх. Размеры ему фиксирует
- * freezeSize() — без этого он пересчитывает раскладку вне потока и текст
- * переверстывается.
+ * Строка сетки не может стать ниже паддинга и рамки своего элемента —
+ * это её минимум даже при min-height: 0. Поэтому у появляющегося и уходящего
+ * тоста схлопываются и они: иначе слот застывал бы на 26px, а соседи в конце
+ * подпрыгивали на эту высоту.
  */
-.kit-toast-leave-active {
-	position: absolute;
+.kit-toast-enter-active .kit-toast,
+.kit-toast-leave-active .kit-toast {
+	transition:
+		padding var(--kit-transition-base),
+		border-width var(--kit-transition-base);
 }
 
-/* Остальные тосты занимают освободившееся место плавно, а не рывком */
+.kit-toast-enter-from .kit-toast,
+.kit-toast-leave-to .kit-toast {
+	padding-block: 0;
+	border-block-width: 0;
+}
+
+/* Тосты, сдвинутые чужим появлением или уходом, едут плавно, а не рывком */
 .kit-toast-move {
 	transition: transform var(--kit-transition-base);
 }
@@ -249,7 +258,15 @@ function freezeSize(el: Element) {
 
 	.kit-toast-enter-from,
 	.kit-toast-leave-to {
+		grid-template-rows: 1fr;
+		margin-bottom: 0;
 		transform: none;
+	}
+
+	.kit-toast-enter-from .kit-toast,
+	.kit-toast-leave-to .kit-toast {
+		padding-block: var(--kit-spacing-md);
+		border-block-width: var(--kit-border-width-thin);
 	}
 
 	.kit-toast-move {

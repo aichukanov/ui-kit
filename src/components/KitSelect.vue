@@ -3,15 +3,18 @@ import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
 import KitIconClose from '../icons/icon-close.vue';
 
 /**
- * Выпадающий список с поиском и виртуализацией.
+ * Выпадающий список с поиском.
  *
- * Виртуализация здесь не преждевременная оптимизация: в админке в список
- * уходит весь каталог — 5237 услуг, 8194 отзыва, 1591 анализ. Без окна
- * раскрытие такого списка вешает вкладку на секунды.
- *
- * Строки бывают двух высот — на одну строку текста и на две; какая нужна,
- * оценивается по длине подписи, а позиции считаются префиксными суммами.
- * Так виртуализация переживает разную высоту строк без замера каждой.
+ * Строки лежат в обычном потоке, и высота у каждой своя — длинная подпись
+ * переносится, короткая занимает одну строку. Большие списки (в админке —
+ * весь каталог: 5237 услуг, 8194 отзыва) не вешают вкладку благодаря
+ * `content-visibility: auto`: браузер не раскладывает и не рисует строки за
+ * пределами видимой области, а их место резервирует по подсказке
+ * `contain-intrinsic-block-size`. Это виртуализация средствами CSS: без
+ * абсолютного позиционирования, оценок высоты и окна видимых строк в JS —
+ * все три предыдущих варианта (фиксированная высота, две высоты по оценке
+ * длины, замер через canvas) либо обрезали подписи, либо промахивались
+ * на чужом шрифте.
  */
 
 type Value = string | number;
@@ -36,12 +39,8 @@ const props = withDefaults(
 		noDataText?: string;
 		ariaLabel?: string;
 		clearLabel?: string;
-		/**
-		 * Перенос подписей на вторую строку. 'auto' — переносятся только те,
-		 * что по оценке не помещаются в ширину панели; true — все строки
-		 * двухстрочные; false — одна строка с многоточием.
-		 */
-		wrapLabels?: boolean | 'auto';
+		/** Переносить длинные подписи (по умолчанию). false — одна строка с многоточием. */
+		wrapLabels?: boolean;
 		/** Сколько строк видно в раскрытом списке. */
 		visibleRows?: number;
 		/**
@@ -67,7 +66,7 @@ const props = withDefaults(
 		noDataText: '',
 		ariaLabel: '',
 		clearLabel: '',
-		wrapLabels: 'auto',
+		wrapLabels: true,
 		visibleRows: 8,
 		remote: false,
 		loading: false,
@@ -89,46 +88,14 @@ const dropdownRef = ref<HTMLElement>();
 const isOpen = ref(false);
 const query = ref('');
 const activeIndex = ref(-1);
-const scrollTop = ref(0);
 const dropdownStyle = ref<Record<string, string>>({});
 
 /*
- * Высоты строк: 36px под одну строку текста, 52px под две. Две получает
- * строка, чья подпись по оценке не помещается в ширину панели.
- *
- * Оценка — по символам, без замера текста: замер через canvas пробовали,
- * он привязан к шрифту конкретного браузера и всё равно требует запаса.
- * Ширина символа зависит от письменности: в системном шрифте 14px кириллица
- * заметно шире латиницы (замер по 253 реальным подписям: 8.2–9.2 px против
- * 6.5–7.5), пробел уже обоих. Плюс запас: ошибка в сторону переноса стоит
- * лишнего воздуха в строке, ошибка в другую — обрезанного названия.
- * Согласовано с CSS строки.
+ * Высота строки с однострочной подписью. Строки растут по содержимому, число
+ * нужно лишь для потолка высоты списка (visibleRows) и как подсказка браузеру
+ * о размере ещё не отрисованных строк. Согласовано с min-height в CSS.
  */
 const ROW = 36;
-const ROW_WRAP = 52;
-const CHAR_WIDTH_CYRILLIC = 8.4;
-const CHAR_WIDTH_LATIN = 7;
-const CHAR_WIDTH_SPACE = 4.5;
-const WRAP_SAFETY_MARGIN = 12;
-
-/* Ширина текста в строке; до первого замера — типичная панель фильтров */
-const textWidth = ref(240);
-
-function estimateWidth(label: string) {
-	let width = 0;
-	for (const ch of label) {
-		if (ch === ' ') width += CHAR_WIDTH_SPACE;
-		else if (/[\u0400-\u04ff]/.test(ch)) width += CHAR_WIDTH_CYRILLIC;
-		else width += CHAR_WIDTH_LATIN;
-	}
-	return width;
-}
-
-function linesFor(label: string) {
-	if (props.wrapLabels === false) return 1;
-	if (props.wrapLabels === true) return 2;
-	return estimateWidth(label) > textWidth.value - WRAP_SAFETY_MARGIN ? 2 : 1;
-}
 
 const selectedValues = computed<Value[]>(() => {
 	if (model.value === null || model.value === undefined) return [];
@@ -183,33 +150,6 @@ const filtered = computed(() => {
 const hasValue = computed(() => selectedValues.value.length > 0);
 
 /*
- * Смещения строк: offsets[i] — верх строки i, offsets[n] — высота всего
- * списка. Позиция строки — не index × height, а сумма высот предыдущих:
- * строки бывают разной высоты, а окно по-прежнему ищется бинарным поиском.
- */
-const offsets = computed(() => {
-	const out = new Array<number>(filtered.value.length + 1);
-	out[0] = 0;
-	filtered.value.forEach((o, i) => {
-		out[i + 1] = out[i] + (linesFor(o.label) === 2 ? ROW_WRAP : ROW);
-	});
-	return out;
-});
-
-/* Индекс строки, в которую попадает вертикальная координата y */
-function rowAt(y: number) {
-	const arr = offsets.value;
-	let lo = 0;
-	let hi = arr.length - 2;
-	while (lo < hi) {
-		const mid = (lo + hi + 1) >> 1;
-		if (arr[mid] <= y) lo = mid;
-		else hi = mid - 1;
-	}
-	return Math.max(0, lo);
-}
-
-/*
  * Сколько места есть под список с той стороны, куда открыта панель.
  * Считается в place(): при зуме или низком окне все строки не помещаются,
  * и без этого ограничения панель уезжала за край окна.
@@ -219,37 +159,12 @@ const roomForList = ref(Infinity);
 /* Меньше трёх строк список перестаёт быть списком — дальше не ужимаем */
 const MIN_ROWS = 3;
 
-const viewportHeight = computed(() => {
-	const n = filtered.value.length;
-	const wanted = offsets.value[Math.min(n, props.visibleRows)];
-	const floor = offsets.value[Math.min(n, MIN_ROWS)];
-	return Math.max(floor, Math.min(wanted, roomForList.value));
-});
-
-/* Окно видимых строк + запас сверху и снизу, чтобы не мигало при прокрутке */
-const OVERSCAN = 4;
-
-const windowStart = computed(() =>
-	Math.max(0, rowAt(scrollTop.value) - OVERSCAN),
-);
-
-const windowEnd = computed(() =>
-	Math.min(
-		filtered.value.length,
-		rowAt(scrollTop.value + viewportHeight.value) + 1 + OVERSCAN,
+/* Потолок высоты списка; короткий список ниже — он по содержимому */
+const listMaxHeight = computed(() =>
+	Math.max(
+		MIN_ROWS * ROW,
+		Math.min(props.visibleRows * ROW, roomForList.value),
 	),
-);
-
-const visibleOptions = computed(() =>
-	filtered.value.slice(windowStart.value, windowEnd.value).map((o, i) => {
-		const index = windowStart.value + i;
-		return {
-			option: o,
-			index,
-			top: offsets.value[index],
-			height: offsets.value[index + 1] - offsets.value[index],
-		};
-	}),
 );
 
 const activeId = computed(() =>
@@ -282,14 +197,13 @@ function place() {
 		close();
 		return;
 	}
-	// Ширина текста строки: панель минус её рамка (2×1), отступ строки
-	// от стенок (2×4) и внутренний паддинг строки (2×12)
-	textWidth.value = r.width - 2 - 8 - 24;
 	// Всё, что в панели кроме списка: рамка, отступы, шапка со слотом
 	const chrome =
 		(dropdownRef.value?.offsetHeight ?? 0) - (listRef.value?.offsetHeight ?? 0);
+	// Сколько панель хотела бы занять: содержимое списка, но не больше потолка
 	const wanted =
-		offsets.value[Math.min(filtered.value.length, props.visibleRows)] + chrome;
+		Math.min(listRef.value?.scrollHeight ?? 0, props.visibleRows * ROW) +
+		chrome;
 	const below = window.innerHeight - r.bottom - GAP;
 	const above = r.top - GAP;
 	const flip = below < wanted && above > below;
@@ -358,7 +272,6 @@ function close() {
 	isOpen.value = false;
 	query.value = '';
 	activeIndex.value = -1;
-	scrollTop.value = 0;
 	roomForList.value = Infinity;
 	stopTracking();
 }
@@ -401,14 +314,12 @@ function removeTag(value: Value) {
 /* --- клавиатура --------------------------------------------------------- */
 
 function scrollActiveIntoView() {
-	const list = listRef.value;
-	if (!list || activeIndex.value < 0) return;
-	const top = offsets.value[activeIndex.value];
-	const bottom = offsets.value[activeIndex.value + 1];
-	if (top < list.scrollTop) list.scrollTop = top;
-	else if (bottom > list.scrollTop + list.clientHeight) {
-		list.scrollTop = bottom - list.clientHeight;
-	}
+	if (activeIndex.value < 0 || typeof document === 'undefined') return;
+	// nearest — подтянуть к ближнему краю, а не центрировать. Работает и для
+	// строк, которые браузер ещё не раскладывал (content-visibility)
+	document
+		.getElementById(`${uid}-opt-${activeIndex.value}`)
+		?.scrollIntoView({ block: 'nearest' });
 }
 
 function move(step: number) {
@@ -496,7 +407,6 @@ onBeforeUnmount(() => {
 watch(query, (q) => {
 	if (props.remote) emit('search', q);
 	activeIndex.value = filtered.value.length ? 0 : -1;
-	scrollTop.value = 0;
 	if (listRef.value) listRef.value.scrollTop = 0;
 	nextTick(place);
 });
@@ -511,19 +421,6 @@ const inputValue = computed(() => {
 	return selectedOptions.value[0]?.label ?? '';
 });
 
-/*
- * Место поля ввода среди тегов. Пока список закрыт, поле не нужно —
- * схлопываем до нуля, иначе оно с min-width переносилось на новую строку
- * и контрол рос в высоту ради пустоты. В открытом списке поле стоит в той
- * же строке, что теги, и растёт по набранному тексту (ширину задаёт скрытое
- * зеркало): высота контрола при открытии не меняется. Плейсхолдер при
- * тегах не показываем — рядом с ними он не помещался и обрезался.
- */
-const inputLayout = computed(() => {
-	if (!props.multiple || !hasValue.value) return '';
-	return isOpen.value && props.filterable ? 'is-inline' : 'is-collapsed';
-});
-
 const inputPlaceholder = computed(() => {
 	if (props.multiple && hasValue.value) return '';
 	if (isOpen.value && props.filterable) {
@@ -531,10 +428,6 @@ const inputPlaceholder = computed(() => {
 	}
 	return props.placeholder;
 });
-
-function onListScroll(e: Event) {
-	scrollTop.value = (e.target as HTMLElement).scrollTop;
-}
 </script>
 
 <template>
@@ -543,7 +436,11 @@ function onListScroll(e: Event) {
 		class="kit-select"
 		:class="[
 			`kit-select--size-${size}`,
-			{ 'is-open': isOpen, 'is-disabled': disabled },
+			{
+				'is-open': isOpen,
+				'is-disabled': disabled,
+				'is-filterable': filterable,
+			},
 		]"
 	>
 		<div class="kit-select__control" @click="toggle">
@@ -578,13 +475,11 @@ function onListScroll(e: Event) {
 					</span>
 				</template>
 
-				<span
-					class="kit-select__input-cell"
-					:class="[inputLayout, { 'is-empty': !query }]"
-				>
-					<!-- Зеркало набранного текста задаёт ширину строчного поля -->
+				<span class="kit-select__input-cell" :class="{ 'is-empty': !query }">
+					<!-- Зеркало набранного текста задаёт ширину строчного поля
+					     среди тегов; в остальных режимах поле само во всю ширину -->
 					<span class="kit-select__input-mirror" aria-hidden="true">{{
-						inputLayout === 'is-inline' ? query : ''
+						multiple && hasValue ? query : ''
 					}}</span>
 					<!-- size=1: иначе собственная ширина поля (~20 символов) задаёт
 					     ширину ячейки, и строчное поле не ужимается до текста -->
@@ -645,6 +540,7 @@ function onListScroll(e: Event) {
 			<div
 				ref="dropdownRef"
 				class="kit-select__dropdown"
+				:class="{ 'kit-select--nowrap': !wrapLabels }"
 				:style="dropdownStyle"
 			>
 				<!-- Подсказка над списком: объясняет смысл выбора до того,
@@ -674,43 +570,32 @@ function onListScroll(e: Event) {
 					class="kit-select__list"
 					role="listbox"
 					:aria-multiselectable="multiple || undefined"
-					:style="{ height: `${viewportHeight}px` }"
-					@scroll="onListScroll"
+					:style="{ maxHeight: `${listMaxHeight}px` }"
 				>
 					<!--
-						Распорка задаёт полную высоту списка, чтобы полоса прокрутки
-						соответствовала всем строкам, а не только отрисованным.
+						v-memo: строка перерисовывается, только если сменилась её
+						активность или выбранность. Без этого движение мыши по списку
+						на 10 000 строк перебирало бы все 10 000 vnode на каждый кадр.
 					-->
 					<div
-						class="kit-select__spacer"
-						:style="{ height: `${offsets[filtered.length]}px` }"
+						v-for="(option, index) in filtered"
+						:id="`${uid}-opt-${index}`"
+						:key="option.value"
+						v-memo="[index === activeIndex, isSelected(option.value)]"
+						class="kit-select__option"
+						:class="{
+							'is-active': index === activeIndex,
+							'is-selected': isSelected(option.value),
+							'is-disabled': option.disabled,
+						}"
+						role="option"
+						:aria-selected="isSelected(option.value)"
+						:aria-disabled="option.disabled || undefined"
+						:title="option.label"
+						@click="pick(option)"
+						@mousemove="activeIndex = index"
 					>
-						<div
-							v-for="row in visibleOptions"
-							:id="`${uid}-opt-${row.index}`"
-							:key="row.option.value"
-							class="kit-select__option"
-							:class="{
-								'is-active': row.index === activeIndex,
-								'is-selected': isSelected(row.option.value),
-								'is-disabled': row.option.disabled,
-								'is-wrapped': row.height === ROW_WRAP,
-							}"
-							role="option"
-							:aria-selected="isSelected(row.option.value)"
-							:aria-disabled="row.option.disabled || undefined"
-							:style="{
-								top: `${row.top}px`,
-								height: `${row.height}px`,
-							}"
-							:title="row.option.label"
-							@click="pick(row.option)"
-							@mousemove="activeIndex = row.index"
-						>
-							<span class="kit-select__option-label">{{
-								row.option.label
-							}}</span>
-						</div>
+						<span class="kit-select__option-label">{{ option.label }}</span>
 					</div>
 				</div>
 			</div>
@@ -847,14 +732,42 @@ function onListScroll(e: Event) {
 }
 
 /*
- * Поле среди тегов в открытом списке занимает остаток последней строки тегов,
- * а не переносится на новую — высота контрола при открытии не меняется.
- * Минимум ширины — по зеркалу: при наборе поле растёт и уходит на новую
- * строку, только когда текст уже не помещается.
+ * Место поля среди тегов решает CSS по состоянию DOM: есть ли теги (:has),
+ * открыт ли список, есть ли поиск. Плейсхолдер при тегах не показываем —
+ * рядом с ними он не помещался и обрезался.
+ *
+ * Список закрыт (или без поиска): поле вне потока — иначе даже нулевой
+ * ширины ему нужен зазор gap, и оно переносилось на пустую строку, а контрол
+ * рос в высоту ради пустоты. Остаётся фокусируемым — это единственный
+ * элемент управления с клавиатуры.
  */
-.kit-select__input-cell.is-inline {
+.kit-select__value:has(.kit-select__tag) .kit-select__input-cell {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	min-width: 0;
+	overflow: hidden;
+	opacity: 0;
+	pointer-events: none;
+}
+
+/*
+ * Список открыт, поиск есть: поле в той же строке, что теги, занимает остаток
+ * последней строки и растёт по набранному тексту (ширину задаёт зеркало) —
+ * высота контрола при открытии не меняется, на новую строку поле уходит,
+ * только когда текст уже не помещается.
+ */
+.kit-select.is-open.is-filterable
+	.kit-select__value:has(.kit-select__tag)
+	.kit-select__input-cell {
+	position: relative;
 	flex: 1 1 0;
+	width: auto;
+	height: auto;
 	min-width: auto;
+	overflow: visible;
+	opacity: 1;
+	pointer-events: auto;
 }
 
 /*
@@ -863,24 +776,11 @@ function onListScroll(e: Event) {
  * последнюю строку тегов даже впритык, а не открывает новую. Каретка при этом
  * стоит сразу за последним тегом; с первым символом зеркало даёт ширину.
  */
-.kit-select__input-cell.is-inline.is-empty {
+.kit-select.is-open.is-filterable
+	.kit-select__value:has(.kit-select__tag)
+	.kit-select__input-cell.is-empty {
 	min-width: 0;
 	margin-left: calc(-1 * var(--kit-spacing-xs));
-}
-
-/*
- * Закрытый список с тегами: поле вне потока, иначе даже нулевой ширины
- * ему нужен зазор gap, и оно переносилось на пустую строку. Остаётся
- * фокусируемым — это единственный элемент управления с клавиатуры.
- */
-.kit-select__input-cell.is-collapsed {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	min-width: 0;
-	overflow: hidden;
-	opacity: 0;
-	pointer-events: none;
 }
 
 .kit-select__tag {
@@ -970,47 +870,47 @@ function onListScroll(e: Event) {
 	overscroll-behavior: contain;
 }
 
-/* Распорка держит полную высоту, строки позиционируются в ней абсолютно */
-.kit-select__spacer {
-	position: relative;
-}
-
+/*
+ * Строка в потоке, высота по содержимому. content-visibility: auto —
+ * виртуализация средствами браузера: строки вне видимой области не
+ * раскладываются и не рисуются, их место резервируется по подсказке
+ * contain-intrinsic-block-size (высота однострочной подписи, согласована
+ * с ROW в скрипте). Так список на 8000 строк открывается мгновенно, а каждая
+ * строка при этом ровно той высоты, какой требует её текст.
+ */
 .kit-select__option {
-	position: absolute;
-	/* Строка не касается стенок панели: подсветка активной строки — это
-	   скруглённая плашка внутри списка, а не полоса от края до края */
-	left: var(--kit-spacing-xs);
-	right: var(--kit-spacing-xs);
 	display: flex;
 	align-items: center;
 	box-sizing: border-box;
-	padding: 0 var(--kit-spacing-md);
+	min-height: 36px;
+	/* Строка не касается стенок панели: подсветка активной строки — это
+	   скруглённая плашка внутри списка, а не полоса от края до края */
+	margin: 0 var(--kit-spacing-xs);
+	padding: var(--kit-spacing-sm) var(--kit-spacing-md);
 	border-radius: var(--kit-border-radius-sm);
 	color: var(--kit-color-text-primary);
 	cursor: pointer;
+	content-visibility: auto;
+	contain-intrinsic-block-size: auto 36px;
 }
 
 /*
  * Подпись — отдельный элемент, а не текст прямо в строке: строка — flex-
- * контейнер, а text-overflow на flex-контейнере не работает, и длинные
- * названия резались по краю без многоточия. Полный текст — в title строки.
+ * контейнер, а text-overflow на flex-контейнере не работает. Полный текст
+ * на всякий случай продублирован в title строки.
  */
 .kit-select__option-label {
 	min-width: 0;
+	line-height: 1.3;
+	/* Слово длиннее строки (ссылка, код) ломается, а не вылезает за край */
+	overflow-wrap: anywhere;
+}
+
+/* wrapLabels=false: одна строка с многоточием */
+.kit-select--nowrap .kit-select__option-label {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-}
-
-/* Двухстрочная строка: перенос с обрезкой на второй строке вместо многоточия */
-.kit-select__option.is-wrapped .kit-select__option-label {
-	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	line-clamp: 2;
-	-webkit-box-orient: vertical;
-	white-space: normal;
-	line-height: 1.3;
-	text-overflow: unset;
 }
 
 .kit-select__option.is-active {
