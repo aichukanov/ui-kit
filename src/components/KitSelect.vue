@@ -94,24 +94,54 @@ const dropdownStyle = ref<Record<string, string>>({});
 
 /*
  * Высоты строк: 36px под одну строку текста, 52px под две. Две получает
- * строка, чья подпись по оценке не помещается в ширину панели. Оценка — по
- * числу символов, а не по замеру текста: измерять 5000 подписей при каждом
- * открытии дорого, а ошибка оценки стоит лишь многоточия на пограничной
- * подписи (однострочные режутся с «…») или лишнего воздуха в строке.
- * Средняя ширина символа системного шрифта в 14px — около 7.7px
- * (кириллица шире латиницы, берём её). Согласовано с CSS строки.
+ * строка, чья подпись не помещается в ширину панели. Ширина подписи
+ * ИЗМЕРЯЕТСЯ через canvas, а не оценивается по числу символов: оценка
+ * промахивалась на пограничных подписях (кириллица шире латиницы), и одни
+ * названия переносились, а соседние обрезались многоточием. Замер одной
+ * подписи — микросекунды, результат кэшируется по строке, так что 5000
+ * подписей меряются один раз за жизнь компонента. Согласовано с CSS строки.
  */
 const ROW = 36;
 const ROW_WRAP = 52;
-const AVG_CHAR_WIDTH = 7.7;
 
 /* Ширина текста в строке; до первого замера — типичная панель фильтров */
 const textWidth = ref(240);
 
+let measurer: CanvasRenderingContext2D | null = null;
+const labelWidths = new Map<string, number>();
+/* Растёт, когда появился измеритель: offsets пересчитываются по замерам */
+const measureVersion = ref(0);
+
+/*
+ * Шрифт берём с корня компонента: у панели тот же размер (sm), а сама панель
+ * в момент расчёта ещё не отрисована. Собираем строку вручную —
+ * getComputedStyle().font в Firefox пуст.
+ */
+function ensureMeasurer() {
+	if (measurer || typeof document === 'undefined' || !rootRef.value) return;
+	const ctx = document.createElement('canvas').getContext('2d');
+	if (!ctx) return;
+	const cs = getComputedStyle(rootRef.value);
+	ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+	measurer = ctx;
+	measureVersion.value++;
+}
+
+function measureLabel(label: string) {
+	const cached = labelWidths.get(label);
+	if (cached !== undefined) return cached;
+	// Без измерителя (SSR, первый кадр) — грубая оценка, она сразу
+	// пересчитается по замерам
+	if (!measurer) return label.length * 7.7;
+	const width = measurer.measureText(label).width;
+	labelWidths.set(label, width);
+	return width;
+}
+
 function linesFor(label: string) {
 	if (props.wrapLabels === false) return 1;
 	if (props.wrapLabels === true) return 2;
-	return label.length * AVG_CHAR_WIDTH > textWidth.value ? 2 : 1;
+	return measureLabel(label) > textWidth.value ? 2 : 1;
 }
 
 const selectedValues = computed<Value[]>(() => {
@@ -172,6 +202,7 @@ const hasValue = computed(() => selectedValues.value.length > 0);
  * строки бывают разной высоты, а окно по-прежнему ищется бинарным поиском.
  */
 const offsets = computed(() => {
+	void measureVersion.value;
 	const out = new Array<number>(filtered.value.length + 1);
 	out[0] = 0;
 	filtered.value.forEach((o, i) => {
@@ -324,6 +355,7 @@ function stopTracking() {
 function open() {
 	if (props.disabled || isOpen.value) return;
 	isOpen.value = true;
+	ensureMeasurer();
 	// Если ничего не выбрано, активен первый: иначе aria-activedescendant
 	// пуст и скринридеру нечего объявить при раскрытии
 	const selectedAt = filtered.value.findIndex((o) => isSelected(o.value));
