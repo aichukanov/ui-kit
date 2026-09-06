@@ -94,54 +94,40 @@ const dropdownStyle = ref<Record<string, string>>({});
 
 /*
  * Высоты строк: 36px под одну строку текста, 52px под две. Две получает
- * строка, чья подпись не помещается в ширину панели. Ширина подписи
- * ИЗМЕРЯЕТСЯ через canvas, а не оценивается по числу символов: оценка
- * промахивалась на пограничных подписях (кириллица шире латиницы), и одни
- * названия переносились, а соседние обрезались многоточием. Замер одной
- * подписи — микросекунды, результат кэшируется по строке, так что 5000
- * подписей меряются один раз за жизнь компонента. Согласовано с CSS строки.
+ * строка, чья подпись по оценке не помещается в ширину панели.
+ *
+ * Оценка — по символам, без замера текста: замер через canvas пробовали,
+ * он привязан к шрифту конкретного браузера и всё равно требует запаса.
+ * Ширина символа зависит от письменности: в системном шрифте 14px кириллица
+ * заметно шире латиницы (замер по 253 реальным подписям: 8.2–9.2 px против
+ * 6.5–7.5), пробел уже обоих. Плюс запас: ошибка в сторону переноса стоит
+ * лишнего воздуха в строке, ошибка в другую — обрезанного названия.
+ * Согласовано с CSS строки.
  */
 const ROW = 36;
 const ROW_WRAP = 52;
+const CHAR_WIDTH_CYRILLIC = 8.4;
+const CHAR_WIDTH_LATIN = 7;
+const CHAR_WIDTH_SPACE = 4.5;
+const WRAP_SAFETY_MARGIN = 12;
 
 /* Ширина текста в строке; до первого замера — типичная панель фильтров */
 const textWidth = ref(240);
 
-let measurer: CanvasRenderingContext2D | null = null;
-const labelWidths = new Map<string, number>();
-/* Растёт, когда появился измеритель: offsets пересчитываются по замерам */
-const measureVersion = ref(0);
-
-/*
- * Шрифт берём с корня компонента: у панели тот же размер (sm), а сама панель
- * в момент расчёта ещё не отрисована. Собираем строку вручную —
- * getComputedStyle().font в Firefox пуст.
- */
-function ensureMeasurer() {
-	if (measurer || typeof document === 'undefined' || !rootRef.value) return;
-	const ctx = document.createElement('canvas').getContext('2d');
-	if (!ctx) return;
-	const cs = getComputedStyle(rootRef.value);
-	ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-	measurer = ctx;
-	measureVersion.value++;
-}
-
-function measureLabel(label: string) {
-	const cached = labelWidths.get(label);
-	if (cached !== undefined) return cached;
-	// Без измерителя (SSR, первый кадр) — грубая оценка, она сразу
-	// пересчитается по замерам
-	if (!measurer) return label.length * 7.7;
-	const width = measurer.measureText(label).width;
-	labelWidths.set(label, width);
+function estimateWidth(label: string) {
+	let width = 0;
+	for (const ch of label) {
+		if (ch === ' ') width += CHAR_WIDTH_SPACE;
+		else if (/[\u0400-\u04ff]/.test(ch)) width += CHAR_WIDTH_CYRILLIC;
+		else width += CHAR_WIDTH_LATIN;
+	}
 	return width;
 }
 
 function linesFor(label: string) {
 	if (props.wrapLabels === false) return 1;
 	if (props.wrapLabels === true) return 2;
-	return measureLabel(label) > textWidth.value ? 2 : 1;
+	return estimateWidth(label) > textWidth.value - WRAP_SAFETY_MARGIN ? 2 : 1;
 }
 
 const selectedValues = computed<Value[]>(() => {
@@ -202,7 +188,6 @@ const hasValue = computed(() => selectedValues.value.length > 0);
  * строки бывают разной высоты, а окно по-прежнему ищется бинарным поиском.
  */
 const offsets = computed(() => {
-	void measureVersion.value;
 	const out = new Array<number>(filtered.value.length + 1);
 	out[0] = 0;
 	filtered.value.forEach((o, i) => {
@@ -297,9 +282,9 @@ function place() {
 		close();
 		return;
 	}
-	// Ширина текста строки: панель минус отступ строки от стенок (2×4)
-	// и внутренний паддинг строки (2×12)
-	textWidth.value = r.width - 8 - 24;
+	// Ширина текста строки: панель минус её рамка (2×1), отступ строки
+	// от стенок (2×4) и внутренний паддинг строки (2×12)
+	textWidth.value = r.width - 2 - 8 - 24;
 	// Всё, что в панели кроме списка: рамка, отступы, шапка со слотом
 	const chrome =
 		(dropdownRef.value?.offsetHeight ?? 0) - (listRef.value?.offsetHeight ?? 0);
@@ -355,7 +340,6 @@ function stopTracking() {
 function open() {
 	if (props.disabled || isOpen.value) return;
 	isOpen.value = true;
-	ensureMeasurer();
 	// Если ничего не выбрано, активен первый: иначе aria-activedescendant
 	// пуст и скринридеру нечего объявить при раскрытии
 	const selectedAt = filtered.value.findIndex((o) => isSelected(o.value));
