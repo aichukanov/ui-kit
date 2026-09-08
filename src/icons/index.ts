@@ -12,3 +12,5 @@ export { default as KitIconAlertCircle } from './icon-alert-circle.vue';
 export { default as KitIconAlertTriangle } from './icon-alert-triangle.vue';
 export { default as KitIconInfo } from './icon-info.vue';
 export { default as KitIconSpinner } from './icon-spinner.vue';
+export { default as KitIconChevronLeft } from './icon-chevron-left.vue';
+export { default as KitIconChevronRight } from './icon-chevron-right.vue';
