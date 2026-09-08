@@ -54,6 +54,13 @@ const props = withDefaults(
 		loadingText?: string;
 		/** Сколько тегов показать в мультивыборе, остальные свернуть в «+N». */
 		maxTags?: number;
+		/**
+		 * Минимальная ширина панели (CSS-длина). По умолчанию панель равна
+		 * контролу; узкому контролу (селектор города в шапке) так тесно —
+		 * задайте ширину, панель станет не уже неё и прижмётся к краю окна,
+		 * если не помещается справа.
+		 */
+		dropdownWidth?: string;
 	}>(),
 	{
 		multiple: false,
@@ -72,6 +79,7 @@ const props = withDefaults(
 		loading: false,
 		loadingText: '',
 		maxTags: 0,
+		dropdownWidth: '',
 	},
 );
 
@@ -181,6 +189,34 @@ function isSelected(value: Value) {
 const GAP = 4;
 
 /*
+ * Область, в которой панель видна целиком. window.innerWidth не годится:
+ * он включает полосу прокрутки, и панель уходила под неё правым краем.
+ * Прокручиваться может и не документ, а body (overflow-y: auto, как в docta,
+ * ещё и со scrollbar-gutter: stable) — тогда полоса живёт внутри body,
+ * и границу даёт его clientWidth.
+ */
+function visibleArea() {
+	const doc = document.documentElement;
+	let right = doc.clientWidth;
+	let bottom = doc.clientHeight;
+	const body = document.body;
+	const overflow = getComputedStyle(body);
+	if (/auto|scroll/.test(overflow.overflowY)) {
+		right = Math.min(
+			right,
+			body.getBoundingClientRect().left + body.clientWidth,
+		);
+	}
+	if (/auto|scroll/.test(overflow.overflowX)) {
+		bottom = Math.min(
+			bottom,
+			body.getBoundingClientRect().top + body.clientHeight,
+		);
+	}
+	return { right, bottom };
+}
+
+/*
  * Позиция считается от прямоугольника триггера, без popper: список
  * фиксированный, ему нужно лишь перевернуться вверх, когда снизу не влезает.
  *
@@ -204,7 +240,8 @@ function place() {
 	const wanted =
 		Math.min(listRef.value?.scrollHeight ?? 0, props.visibleRows * ROW) +
 		chrome;
-	const below = window.innerHeight - r.bottom - GAP;
+	const { right: viewportWidth, bottom: viewportHeight } = visibleArea();
+	const below = viewportHeight - r.bottom - GAP;
 	const above = r.top - GAP;
 	const flip = below < wanted && above > below;
 	const room = flip ? above : below;
@@ -212,11 +249,23 @@ function place() {
 
 	// Координаты округляем: на доле пикселя однопиксельная рамка размывается
 	// и с одной стороны выглядит толще, чем с другой
+	const width = Math.round(r.width);
+	// Панель шире контрола не должна уходить за правый край окна — сдвигаем
+	// влево. Её фактическая ширина известна только после отрисовки; слежение
+	// покадровое, поэтому на следующем кадре позиция уточнится сама
+	const actual = dropdownRef.value?.offsetWidth ?? width;
+	const left = Math.max(
+		GAP,
+		Math.min(Math.round(r.left), viewportWidth - GAP - actual),
+	);
 	const next: Record<string, string> = {
-		left: `${Math.round(r.left)}px`,
-		width: `${Math.round(r.width)}px`,
+		left: `${left}px`,
+		width: props.dropdownWidth
+			? `max(${width}px, ${props.dropdownWidth})`
+			: `${width}px`,
+		maxWidth: `${viewportWidth - 2 * GAP}px`,
 		...(flip
-			? { bottom: `${Math.round(window.innerHeight - r.top + GAP)}px` }
+			? { bottom: `${Math.round(viewportHeight - r.top + GAP)}px` }
 			: { top: `${Math.round(r.bottom + GAP)}px` }),
 	};
 	// Панель следит за триггером покадрово — не дёргаем реактивность зря
@@ -224,6 +273,7 @@ function place() {
 	if (
 		prev.left !== next.left ||
 		prev.width !== next.width ||
+		prev.maxWidth !== next.maxWidth ||
 		prev.top !== next.top ||
 		prev.bottom !== next.bottom
 	) {
@@ -456,7 +506,7 @@ const inputPlaceholder = computed(() => {
 						:key="opt.value"
 						class="kit-select__tag"
 					>
-						{{ opt.label }}
+						<span class="kit-select__tag-label">{{ opt.label }}</span>
 						<button
 							type="button"
 							class="kit-select__tag-remove"
@@ -794,6 +844,15 @@ const inputPlaceholder = computed(() => {
 	color: var(--kit-color-text-secondary);
 	font-size: var(--kit-font-size-xs);
 	white-space: nowrap;
+}
+
+/*
+ * Подпись тега — отдельный элемент: тег — flex-контейнер, text-overflow на
+ * нём не работает, и длинное название выталкивало крестик за край тега.
+ * Теперь ужимается подпись, а крестик (flex-shrink: 0) остаётся на месте.
+ */
+.kit-select__tag-label {
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
