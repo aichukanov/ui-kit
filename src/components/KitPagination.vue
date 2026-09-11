@@ -110,8 +110,28 @@ interface Cell {
 	page: number;
 	disabled: boolean;
 	isCurrent: boolean;
+	/** Прячется на узком экране — см. комментарий у `cells`. */
+	collapsible: boolean;
 }
 
+/*
+ * Узкий экран: соседей текущей страницы прячем, остаются `‹ 1 … 4 … 67 ›`.
+ *
+ * Перенос на вторую строку — не вариант: он запрещён во всех системах, где
+ * это вообще проговорено (USWDS держит `row nowrap` и пишет «avoid using
+ * Pagination in any context where it would be more than one line long»).
+ * Срезание слотов по мере сужения — ровно то, что делают eBay (минимум пять
+ * слотов) и слотовая модель USWDS.
+ *
+ * Прятать можно НЕ любого соседа, а только того, на чьей стороне уже есть
+ * многоточие: иначе `1 [3] 5` соврёт, что страниц 2 и 4 не существует.
+ * Когда страниц мало и многоточий нет, прятать нечего — полный набор и так
+ * помещается в строку.
+ *
+ * Скрытие CSS-ом, а не пересчётом набора: `pagerCount` по ширине окна
+ * разъехался бы с серверной разметкой при гидратации. Ссылки при этом
+ * остаются в DOM, то есть путь обхода вглубь листинга не страдает.
+ */
 const cells = computed<Cell[]>(() => {
 	const count = pageCount.value;
 	const { pages, hasPrevMore, hasNextMore } = middlePages.value;
@@ -122,6 +142,11 @@ const cells = computed<Cell[]>(() => {
 		page,
 		disabled: props.disabled,
 		isCurrent: page === current.value,
+		collapsible:
+			page !== 1 &&
+			page !== count &&
+			page !== current.value &&
+			(page < current.value ? hasPrevMore : hasNextMore),
 	});
 	const moreCell = (key: string): Cell => ({
 		key,
@@ -129,6 +154,7 @@ const cells = computed<Cell[]>(() => {
 		page: 0,
 		disabled: true,
 		isCurrent: false,
+		collapsible: false,
 	});
 
 	const list: Cell[] = [
@@ -138,6 +164,7 @@ const cells = computed<Cell[]>(() => {
 			page: current.value - 1,
 			disabled: props.disabled || current.value <= 1,
 			isCurrent: false,
+			collapsible: false,
 		},
 		pageCell(1),
 	];
@@ -159,6 +186,7 @@ const cells = computed<Cell[]>(() => {
 		page: current.value + 1,
 		disabled: props.disabled || current.value >= count,
 		isCurrent: false,
+		collapsible: false,
 	});
 
 	return list;
@@ -199,7 +227,12 @@ const onLinkClick = (event: MouseEvent, page: number) => {
 
 <template>
 	<ul class="kit-pagination">
-		<li v-for="cell in cells" :key="cell.key" class="kit-pagination__cell">
+		<li
+			v-for="cell in cells"
+			:key="cell.key"
+			class="kit-pagination__cell"
+			:class="{ 'kit-pagination__cell--collapsible': cell.collapsible }"
+		>
 			<span
 				v-if="cell.type === 'more'"
 				class="kit-pagination__more"
@@ -248,7 +281,9 @@ const onLinkClick = (event: MouseEvent, page: number) => {
 .kit-pagination {
 	display: flex;
 	align-items: center;
-	flex-wrap: wrap;
+	/* Пейджер живёт в одну строку всегда: вторая строка — это уже не пейджер,
+	   а сыпь из кнопок. Не влезающее срезается медиазапросом ниже. */
+	flex-wrap: nowrap;
 	justify-content: center;
 	gap: var(--kit-spacing-xs);
 	margin: 0;
@@ -323,10 +358,30 @@ const onLinkClick = (event: MouseEvent, page: number) => {
  * широким экраном палец такой же.
  */
 @media (hover: none) and (pointer: coarse) {
-	.kit-pagination__item,
-	.kit-pagination__more {
+	.kit-pagination__item {
 		min-width: 44px;
 		height: 44px;
+	}
+
+	.kit-pagination__more {
+		height: 44px;
+	}
+}
+
+/*
+ * Узкий экран — условие по ШИРИНЕ, в отличие от тач-целей выше: там речь про
+ * палец, здесь про то, что девять слотов по 44px (428px) не помещаются.
+ * Порог тот же, на котором обёртка приложения переносит пейджер в центр.
+ *
+ * Многоточие при этом ужимается: оно не кликабельно, тач-цель ему не нужна.
+ */
+@media (max-width: 600px) {
+	.kit-pagination__cell--collapsible {
+		display: none;
+	}
+
+	.kit-pagination__more {
+		min-width: 24px;
 	}
 }
 </style>
